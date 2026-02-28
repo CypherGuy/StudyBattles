@@ -1,0 +1,51 @@
+name: PhaseCompiler Import
+
+on:
+  workflow_dispatch:
+    inputs:
+      plan_path:
+        description: "Path to plan.json"
+        required: false
+        default: "plan.json"
+      dry_run:
+        description: "If true, do not create anything"
+        required: false
+        default: "false"
+  push:
+    branches: ["main"]
+    paths:
+      - "plan.json"
+      - "scripts/phasecompiler-import.py"
+      - ".github/workflows/phasecompiler-import.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Import plan into GitHub Issues/Milestones
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PLAN_PATH: ${{ inputs.plan_path }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          PLAN_PATH="${PLAN_PATH:-plan.json}"
+          DRY_RUN="${DRY_RUN:-false}"
+          python scripts/phasecompiler_import.py "$PLAN_PATH" --dry-run "$DRY_RUN"

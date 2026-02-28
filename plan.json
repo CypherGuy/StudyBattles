@@ -1,0 +1,178 @@
+{
+  "project": {
+    "name": "StudyBattles",
+    "description": "A revision tool where students upload study materials (PPTX, DOCX, YouTube videos), the system generates a topic hierarchy via OpenAI LLM, and they grind through boss encounters to prove understanding. Users answer predetermined question types, get marked against LLM-generated key points, and unlock parent nodes only after defeating all children.",
+    "tech_stack": "Python (FastAPI), React, MongoDB",
+    "runtime": "web",
+    "primary_user": "Just yourself (MVP testing)",
+    "completion_criteria": "User can upload a document, generate a boss tree, click into bottom nodes, answer questions in predetermined formats, receive marks based on LLM-generated mark schemes, and unlock parent nodes after defeating all children."
+  },
+  "phases": [
+    {
+      "id": 1,
+      "title": "Project Setup & Infrastructure",
+      "deliverable": "FastAPI backend running locally, React frontend scaffolded, MongoDB connection established, AWS account configured with S3 bucket for document storage",
+      "tasks": [
+        "Initialize FastAPI project with uvicorn, add basic health check endpoint",
+        "Set up MongoDB connection (local for now, can migrate to AWS later)",
+        "Initialize React project with Vite or create-react-app, set up routing structure",
+        "Create AWS S3 bucket for document uploads, configure IAM user with S3 permissions",
+        "Set up environment files (.env) for API keys (OpenAI, AWS credentials, MongoDB URI)"
+      ],
+      "commit_condition": "FastAPI server starts on localhost:8000, React frontend loads on localhost:3000, MongoDB connection logs successful, S3 bucket accessible via AWS CLI",
+      "example_input": "None (starting from scratch)",
+      "example_output": "Project skeleton with FastAPI + React running, AWS credentials configured, MongoDB ready"
+    },
+    {
+      "id": 2,
+      "title": "Document Upload & Storage Pipeline",
+      "deliverable": "Endpoint to upload PPTX/DOCX/YouTube URLs, extract text, store in MongoDB with session association",
+      "tasks": [
+        "Create FastAPI endpoint POST /upload to accept file uploads (PPTX, DOCX) and YouTube URLs",
+        "Implement text extraction from PPTX and DOCX (using python-pptx and python-docx libraries)",
+        "Implement YouTube transcript extraction (using youtube-transcript-api or similar)",
+        "Store extracted text in MongoDB with metadata (upload time, file type, user session ID)",
+        "Create React component for file upload UI with drag-and-drop support"
+      ],
+      "commit_condition": "Can upload a PPTX, DOCX, and YouTube URL via React UI; text extracted and stored in MongoDB; verified in MongoDB shell",
+      "example_input": "User selects file or pastes YouTube URL",
+      "example_output": "MongoDB document with extracted text, file metadata, and session ID"
+    },
+    {
+      "id": 3,
+      "title": "LLM Topic Hierarchy Generation",
+      "deliverable": "Endpoint that takes extracted text and generates a topic tree via OpenAI, stores tree structure in MongoDB",
+      "tasks": [
+        "Create FastAPI endpoint POST /generate-tree that accepts document ID",
+        "Design prompt for OpenAI to recursively generate topic hierarchy (each topic + prerequisites)",
+        "Implement logic to constrain tree depth and branching factor",
+        "Store generated tree in MongoDB with phase-lock logic (bottom nodes unlocked, parents locked)",
+        "Add validation to ensure tree structure is valid (no cycles, proper parent-child relationships)"
+      ],
+      "commit_condition": "API call returns a valid tree structure (JSON with node IDs, titles, parent/child relationships); tree persists in MongoDB",
+      "example_input": "Document ID from Phase 2",
+      "example_output": "MongoDB tree document with structure like {id, title, children: [], locked: true/false, prerequisites: []}"
+    },
+    {
+      "id": 4,
+      "title": "Boss Question Generation & Mark Scheme",
+      "deliverable": "For each node in the tree, generate 5 questions (one per predetermined type) with mark schemes via OpenAI",
+      "tasks": [
+        "Create FastAPI endpoint POST /generate-questions that accepts node ID and relevant document text",
+        "Design prompts for OpenAI for each question type: Define, Solve, Compare, ELI5, Finish the Answer",
+        "Generate 5 questions per node (or fewer if subject doesn't fit all types)",
+        "For each question, generate a mark scheme (list of key points) via OpenAI",
+        "Store questions + mark schemes in MongoDB, indexed by node ID"
+      ],
+      "commit_condition": "For a given node, can retrieve 5 questions with mark schemes; mark schemes are lists of strings (key points)",
+      "example_input": "Node ID, document text snippet",
+      "example_output": "MongoDB questions document: {node_id, questions: [{type, text, mark_scheme: []}]}"
+    },
+    {
+      "id": 5,
+      "title": "Session & State Management (Backend)",
+      "deliverable": "Session endpoints to track user progress, unlock status, and attempt history in MongoDB",
+      "tasks": [
+        "Create session model in MongoDB: {session_id, tree_id, node_unlock_status, attempts: {node_id: []}}",
+        "Create endpoint POST /session to generate unique session ID and initialize state",
+        "Create endpoint GET /session/{session_id} to retrieve current unlock status and progress",
+        "Implement unlock logic: when all children beaten, mark parent as unlocked",
+        "Create endpoint to track user attempts (answers, marks received, timestamp)"
+      ],
+      "commit_condition": "Can create a session, retrieve its state, and verify that parent nodes remain locked until children are beaten",
+      "example_input": "None (session created on first page load)",
+      "example_output": "Session document with tree structure and unlock status for each node"
+    },
+    {
+      "id": 6,
+      "title": "Frontend: Tree Visualization & Navigation",
+      "deliverable": "React component to display the boss tree (top-down layout), show node unlock status, allow clicking unlocked nodes",
+      "tasks": [
+        "Design React component to render tree in top-down layout (use Recharts, React Flow, or custom canvas)",
+        "Implement visual indicators for locked vs. unlocked nodes",
+        "Add click handler to navigate to question screen for unlocked nodes",
+        "Fetch tree and unlock status from backend on component mount",
+        "Add refresh button to re-fetch state (for testing session persistence)"
+      ],
+      "commit_condition": "Tree renders visually, locked nodes appear grayed out, unlocked nodes are clickable, clicking navigates to question page",
+      "example_input": "Session ID from backend",
+      "example_output": "Rendered tree component with interactive nodes"
+    },
+    {
+      "id": 7,
+      "title": "Frontend: Question Display & Answer Input",
+      "deliverable": "React component to display a single question and collect user answer in text form",
+      "tasks": [
+        "Create React component for question display (shows question text, type, and node title)",
+        "Add textarea for user answer input, with character limit feedback",
+        "Add submit button that sends answer to backend",
+        "Show loading state while backend evaluates answer",
+        "Implement return-to-tree button after answering"
+      ],
+      "commit_condition": "Can view a question, type an answer, submit it, and see loading state",
+      "example_input": "Node ID and question from URL/props",
+      "example_output": "User answer submitted to backend"
+    },
+    {
+      "id": 8,
+      "title": "Answer Evaluation & Marking Logic",
+      "deliverable": "FastAPI endpoint to evaluate user answers against mark schemes and return marks",
+      "tasks": [
+        "Create endpoint POST /evaluate that accepts node_id, question_id, and user_answer",
+        "Implement Python logic: for each key point in mark scheme, check if key point is 'in' user_answer",
+        "Return marks as {marks_received, marks_total, key_points_hit: []} for debugging",
+        "Handle edge cases: partial key point matches, case-insensitivity, punctuation tolerance",
+        "Store evaluation result in session's attempt history"
+      ],
+      "commit_condition": "API returns correct marks for test answers; mark scheme key points are properly checked",
+      "example_input": "User answer, mark scheme list",
+      "example_output": "{marks_received: 2, marks_total: 3, key_points_hit: [true, false, true]}"
+    },
+    {
+      "id": 9,
+      "title": "Frontend: Result Display & Unlock Logic",
+      "deliverable": "React component to display marks received, show which key points were hit, and visually confirm unlock of parent node if applicable",
+      "tasks": [
+        "Create result component to show marks (e.g., '2/3'), display key points with hit/miss indicators",
+        "Show feedback message (e.g., 'You missed: Multiply the coefficient BEFORE...')",
+        "If all children beaten, show parent unlock message and animation",
+        "Add 'Try again' button to retry the same question (optionally generate new question)",
+        "Add 'Back to tree' button to return to tree view"
+      ],
+      "commit_condition": "Result component displays correctly; unlock message appears when appropriate; state updates in backend",
+      "example_input": "Evaluation result from backend",
+      "example_output": "User sees marks, key points, and confirmation of progress"
+    },
+    {
+      "id": 10,
+      "title": "Session Persistence & Data Retrieval",
+      "deliverable": "Frontend-side session storage (via session ID in URL or localStorage) ensuring data survives page reload",
+      "tasks": [
+        "Implement session ID generation on first page load (POST /session)",
+        "Store session ID in localStorage (or URL as query param)",
+        "On page load/reload, fetch session state from backend using stored session ID",
+        "Restore tree state, unlock status, and attempt history",
+        "Verify that attempting same node twice generates new questions (but same mark scheme initially)"
+      ],
+      "commit_condition": "Close and reopen browser; session persists, tree state restored, user can continue from where they left off",
+      "example_input": "Page reload with existing session ID",
+      "example_output": "Session state retrieved from MongoDB, UI re-renders with correct state"
+    },
+    {
+      "id": 11,
+      "title": "Testing, Bug Fixes & MVP Polish",
+      "deliverable": "End-to-end testing of core flow, bug fixes, basic error handling, and clean UI",
+      "tasks": [
+        "Test full flow: upload document → generate tree → answer questions → unlock parents",
+        "Add error handling for failed document uploads, generation timeouts, API failures",
+        "Add loading spinners and user feedback messages throughout",
+        "Test session persistence (close/reopen, different tabs, incognito mode if possible)",
+        "Fix UI bugs, improve spacing/colors, ensure responsive design for mobile (even if not deployed yet)",
+        "Create simple README with instructions to run locally"
+      ],
+      "commit_condition": "Full MVP flow works without errors, session persists across reloads, no console errors, UI is clean and responsive",
+      "example_input": "All previous phases working",
+      "example_output": "Fully functional MVP ready for personal testing and iteration"
+    }
+  ]
+}

@@ -809,6 +809,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-multipart" },
     { name = "requests" },
 ]
 
@@ -818,6 +819,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.134.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "requests", specifier = ">=2.32.5" },
 ]
 

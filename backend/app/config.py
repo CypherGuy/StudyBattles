@@ -1,9 +1,7 @@
-# Used to call passwords from any file
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
-
-load_dotenv()
+ENV_PATH = Path(__file__).resolve().parent / ".env"
 
 class Settings(BaseSettings):
     mongodb_uri: str
@@ -11,6 +9,13 @@ class Settings(BaseSettings):
     aws_access_key_id: str
     aws_secret_access_key: str
     aws_region: str = "us-east-1"
-    
-    class Config:
-        env_file = ".env"
+
+    rapidapi_key: str
+    rapidapi_host: str
+
+    model_config = SettingsConfigDict(
+        env_file=ENV_PATH,
+        env_file_encoding="utf-8"
+    )
+
+settings = Settings()

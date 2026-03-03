@@ -30,6 +30,8 @@ async def upload(
             detail="Provide at least one file or a YouTube URL.",
         )
 
+    document_id = None
+
     if url_given:
         parsed = urlparse(url)
         if parsed.netloc not in {"www.youtube.com", "youtube.com", "youtu.be"}:
@@ -37,7 +39,7 @@ async def upload(
 
         text = extract_youtube_text(url)
 
-        documents_collection.insert_one(
+        result = documents_collection.insert_one(
             {
                 "name": url,
                 "extracted_text": text,
@@ -45,6 +47,7 @@ async def upload(
                 "upload_time": datetime.now(timezone.utc),
             }
         )
+        document_id = str(result.inserted_id)
 
     if files_given:
         for f in files:
@@ -62,7 +65,7 @@ async def upload(
             ext = f.filename.rsplit(".", 1)[-1]
             ext = re.sub(r"\s+", "", ext, flags=re.UNICODE).lower()
 
-            documents_collection.insert_one(
+            result = documents_collection.insert_one(
                 {
                     "name": f.filename,
                     "extracted_text": text,
@@ -70,8 +73,9 @@ async def upload(
                     "upload_time": datetime.now(timezone.utc),
                 }
             )
+            document_id = str(result.inserted_id)
 
-    return {"message": "OK"}
+    return {"message": "OK", "document_id": document_id}
 
 
 def extract_youtube_text(url: str) -> str:

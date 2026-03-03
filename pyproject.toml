@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "dotenv>=0.9.9",
     "fastapi[standard]>=0.134.0",
+    "openai>=2.24.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "pymongo[srv]>=4.16.0",

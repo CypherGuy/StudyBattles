@@ -6,6 +6,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [documentId, setDocumentId] = useState(null);
+  const [tree, setTree] = useState(null);
+  const [treeLoading, setTreeLoading] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -67,6 +70,10 @@ export default function Home() {
 
       if (response.ok) {
         setMessage('File uploaded successfully!');
+        // Store document ID from response if available
+        if (data.document_id) {
+          setDocumentId(data.document_id);
+        }
         setFile(null);
         document.getElementById('fileInput').value = '';
       } else {
@@ -101,6 +108,10 @@ export default function Home() {
 
       if (response.ok) {
         setMessage('YouTube video uploaded successfully!');
+        // Store document ID from response if available
+        if (data.document_id) {
+          setDocumentId(data.document_id);
+        }
         setYoutubeUrl('');
       } else {
         setMessage(`Error: ${data.detail || 'Upload failed'}`);
@@ -112,8 +123,37 @@ export default function Home() {
     }
   };
 
+  const handleGenerateTree = async () => {
+    if (!documentId) {
+      setMessage('Please upload a document first');
+      return;
+    }
+
+    setTreeLoading(true);
+    setMessage('Generating learning tree...');
+
+    try {
+      const response = await fetch(`http://localhost:8000/generate-tree?document_id=${documentId}`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setTree(data);
+        setMessage('Tree generated successfully!');
+      } else {
+        setMessage(`Error: ${data.error || 'Failed to generate tree'}`);
+      }
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setTreeLoading(false);
+    }
+  };
+
   return (
-    <div>
+    <div style={{ padding: '20px' }}>
       <h1>StudyBattles</h1>
       
       <div style={{ marginTop: '20px' }}>
@@ -152,7 +192,7 @@ export default function Home() {
         <button
           onClick={handleUpload}
           disabled={loading || !file}
-          style={{ marginTop: '10px' }}
+          style={{ marginTop: '10px', padding: '8px 16px' }}
         >
           {loading ? 'Uploading...' : 'Upload'}
         </button>
@@ -171,11 +211,24 @@ export default function Home() {
         <button
           onClick={handleYoutubeUpload}
           disabled={loading}
-          style={{ marginLeft: '10px' }}
+          style={{ marginLeft: '10px', padding: '8px 16px' }}
         >
           {loading ? 'Uploading...' : 'Upload'}
         </button>
       </div>
+
+      {documentId && (
+        <div style={{ marginTop: '30px' }}>
+          <h2>Generate Learning Tree</h2>
+          <button
+            onClick={handleGenerateTree}
+            disabled={treeLoading}
+            style={{ padding: '8px 16px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            {treeLoading ? 'Generating...' : 'Generate Tree'}
+          </button>
+        </div>
+      )}
 
       {message && (
         <p style={{
@@ -185,6 +238,15 @@ export default function Home() {
         }}>
           {message}
         </p>
+      )}
+
+      {tree && (
+        <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#2662b0', borderRadius: '8px' }}>
+          <h2>Learning Tree</h2>
+          <pre style={{ overflow: 'auto', maxHeight: '500px', padding: '10px', backgroundColor: '#164568', borderRadius: '4px' }}>
+            {JSON.stringify(tree.root, null, 2)}
+          </pre>
+        </div>
       )}
     </div>
   );

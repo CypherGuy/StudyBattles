@@ -17,10 +17,15 @@ async def generate_tree(document_id: str):
     document_name = document["name"]
 
     hierachy = generate_hierarchy_from_text(document_text)
-    
+    valid, msg = validate_tree(hierachy)
+    if not valid:
+        raise ValueError(msg)
+
     # Store in MongoDB
     tree = {
         "document_id": document_id,
+        "document_name": document_name,
+        "document_type": document_type,
         "root": hierachy
     }
 
@@ -28,10 +33,23 @@ async def generate_tree(document_id: str):
     return {"tree_id": str(result.inserted_id), "root": tree["root"]}
 
 
+def validate_tree(node, depth=0, max_depth=3, max_children=4):
+    if not node.get("title"):
+        return False, "Node doesn't have a title"
 
+    if depth > max_depth:
+        return False, f"Tree exceeds max depth of {max_depth}"
 
+    children = node.get("children", [])
+    if len(children) > max_children:
+        return False, f"Node has {len(children)} children, max is {max_children}"
 
+    for child in children:
+        valid, msg = validate_tree(child, depth + 1, max_depth, max_children)
+        if not valid:
+            return valid, msg
 
+    return True, "Valid"
 
 
 def generate_hierarchy_from_text(text: str, max_depth: int = 3, max_children: int = 4):
@@ -91,10 +109,10 @@ def generate_hierarchy_from_text(text: str, max_depth: int = 3, max_children: in
     Return ONLY valid, parseable JSON with no additional text, explanation, or markdown formatting. 
     """
 
-    
     response = client.responses.create(
         model="gpt-5-mini-2025-08-07",
         input=prompt
     )
-    
-    return response.output_text
+
+    json_formatted_reply = json.loads(response.output_text)
+    return json_formatted_reply

@@ -33,7 +33,7 @@ async def generate_tree(document_id: str):
     return {"tree_id": str(result.inserted_id), "root": tree["root"]}
 
 
-def validate_tree(node, depth=0, max_depth=3, max_children=4):
+def validate_tree(node, depth=0, max_depth=4, max_children=4):
     if not node.get("title"):
         return False, "Node doesn't have a title"
 
@@ -52,7 +52,7 @@ def validate_tree(node, depth=0, max_depth=3, max_children=4):
     return True, "Valid"
 
 
-def generate_hierarchy_from_text(text: str, max_depth: int = 3, max_children: int = 4):
+def generate_hierarchy_from_text(text: str, max_depth: int = 4, max_children: int = 4):
     client = OpenAI(api_key=settings.openai_api_key)
     prompt = f"""
     Given the study material, and only the following study notes/materials:
@@ -64,6 +64,8 @@ def generate_hierarchy_from_text(text: str, max_depth: int = 3, max_children: in
     - Each node has prerequisite children
     - Max depth: {max_depth}
     - Max children per node: {max_children}
+
+    There is no need to fill in every available space to add a topic if you don't need to.
     
     Here is an example of the JSON that you need to output. Keep the exact same keys, only change the values. Note how I implement recursion of the children array indicating child nodes and leaf nodes:
     {{

@@ -1,9 +1,12 @@
 from fastapi import APIRouter
-from db import documents_collection, trees_collection
+from .generate_questions import generate_questions_and_answers
+
+from db import documents_collection, trees_collection, nodes_collection
 from config import settings
 from openai import OpenAI
 import json
 from bson import ObjectId
+import asyncio
 
 
 router = APIRouter()
@@ -30,7 +33,51 @@ async def generate_tree(document_id: str):
     }
 
     result = trees_collection.insert_one(tree)
-    return {"tree_id": str(result.inserted_id), "root": tree["root"]}
+    tree_id = str(result.inserted_id)
+
+    documents_collection.update_one({"_id": ObjectId(document_id)}, {
+                                    "$set": {"tree_id": tree_id}})
+
+    node_paths = extract_all_node_paths(hierachy)
+    for node_path in node_paths:
+        node_doc = {
+            "tree_id": tree_id,
+            "node_path": node_path,
+            "questions": []
+        }
+        nodes_collection.insert_one(node_doc)
+
+    add_paths_to_tree(hierachy)
+
+    # Generate questions in the background
+    asyncio.create_task(generate_questions_background(
+        tree_id, node_paths, document_text))
+
+    return {"tree_id": tree_id, "root": hierachy}
+
+
+async def generate_questions_background(tree_id, node_paths, document_text):
+    tasks = [
+        generate_questions_and_answers(tree_id, node_path, document_text)
+        for node_path in node_paths
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    completed = sum(1 for r in results if r is not None)
+    failed = len(results) - completed
+
+    if failed > 0:
+        print(f"Failed to generate questions for {failed} nodes")
+
+
+def add_paths_to_tree(node, current_path=""):
+    if current_path:
+        node['path'] = f"{current_path}/{node['title']}"
+    else:
+        node['path'] = node['title']
+
+    if 'children' in node and node['children']:
+        for child in node['children']:
+            add_paths_to_tree(child, node['path'])
 
 
 def validate_tree(node, depth=0, max_depth=4, max_children=4):
@@ -52,13 +99,34 @@ def validate_tree(node, depth=0, max_depth=4, max_children=4):
     return True, "Valid"
 
 
+def extract_all_node_paths(node, current_path=""):
+    """
+    Recursively extract all node paths from the hierarchy tree.
+    Returns a list of paths as strings like "Topic/Subtopic/SubSubtopic"
+    """
+    # Build the current path by appending the node's title
+    if current_path:
+        node_path = f"{current_path}/{node['title']}"
+    else:
+        node_path = node['title']
+
+    paths = [node_path]
+
+    if 'children' in node:
+        for child in node['children']:
+            child_paths = extract_all_node_paths(child, node_path)
+            paths.extend(child_paths)
+
+    return paths
+
+
 def generate_hierarchy_from_text(text: str, max_depth: int = 4, max_children: int = 4):
     client = OpenAI(api_key=settings.openai_api_key)
     prompt = f"""
     Given the study material, and only the following study notes/materials:
-    
-    {text[:2500]} 
-    
+
+    {text[:3000]}
+
     Generate a topic hierarchy in JSON format where:
     - The root is the overarching topic
     - Each node has prerequisite children
@@ -66,7 +134,7 @@ def generate_hierarchy_from_text(text: str, max_depth: int = 4, max_children: in
     - Max children per node: {max_children}
 
     There is no need to fill in every available space to add a topic if you don't need to.
-    
+
     Here is an example of the JSON that you need to output. Keep the exact same keys, only change the values. Note how I implement recursion of the children array indicating child nodes and leaf nodes:
     {{
     "title": "Calculus",
@@ -108,7 +176,7 @@ def generate_hierarchy_from_text(text: str, max_depth: int = 4, max_children: in
 
     Do not add any other text, only output JSON without rambling. Do not exceed max_depth of {max_depth}. Do not give any node more than {max_children} children.
 
-    Return ONLY valid, parseable JSON with no additional text, explanation, or markdown formatting. 
+    Do not at any point include a slash (/) in your output, especially in titles. Return ONLY valid, parseable JSON with no additional text, explanation, or markdown formatting.
     """
 
     response = client.responses.create(

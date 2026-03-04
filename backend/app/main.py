@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routes import health, upload, generate_tree
+from routes import health, upload, generate_tree, generate_questions
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -19,3 +19,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(upload.router)
 app.include_router(generate_tree.router)
+app.include_router(generate_questions.router)

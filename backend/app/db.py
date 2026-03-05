@@ -6,5 +6,6 @@ db = client["studybattles"]
 
 documents_collection = db["documents"]
 trees_collection = db["trees"]
-questions_collection = db["questions"]
 nodes_collection = db["nodes"]
+sessions_collection = db["sessions"]
+attempts_collection = db["attempts"]

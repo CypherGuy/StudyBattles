@@ -29,3 +29,11 @@ async def create_session(tree_id: str):
     })
 
     return {"session_id": session_id, "node_unlock_status": node_unlock_status}
+
+
+@router.get("/session/{session_id}")
+async def get_progress_and_unlock_status(session_id):
+    session = sessions_collection.find_one(
+        {"session_id": session_id})
+    node_unlock_status = session["node_unlock_status"]
+    return {"session_id": session_id, "node_unlock_status": node_unlock_status}

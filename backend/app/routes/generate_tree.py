@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from .generate_questions import generate_questions_and_answers
 
-from db import documents_collection, trees_collection, nodes_collection
+from db import documents_collection, trees_collection, nodes_collection, sessions_collection
 from config import settings
 from openai import OpenAI
 import json
@@ -48,6 +48,7 @@ async def generate_tree(document_id: str):
         nodes_collection.insert_one(node_doc)
 
     add_paths_to_tree(hierachy)
+    extract_locked_status(hierachy)
 
     # Generate questions in the background
     asyncio.create_task(generate_questions_background(
@@ -78,6 +79,17 @@ def add_paths_to_tree(node, current_path=""):
     if 'children' in node and node['children']:
         for child in node['children']:
             add_paths_to_tree(child, node['path'])
+
+
+def extract_locked_status(node):
+    ret = {}
+    ret[node['path']] = node['locked']
+    if not node['children'] or len(node['children']) == 0:
+        ret[node['path']] = False
+    else:
+        for child in node['children']:
+            ret.update(extract_locked_status(child))
+    return ret
 
 
 def validate_tree(node, depth=0, max_depth=4, max_children=4):

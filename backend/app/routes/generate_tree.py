@@ -19,8 +19,8 @@ async def generate_tree(document_id: str):
     document_type = document["file_type"]
     document_name = document["name"]
 
-    hierachy = generate_hierarchy_from_text(document_text)
-    valid, msg = validate_tree(hierachy)
+    hierarchy = generate_hierarchy_from_text(document_text)
+    valid, msg = validate_tree(hierarchy)
     if not valid:
         raise ValueError(msg)
 
@@ -29,7 +29,7 @@ async def generate_tree(document_id: str):
         "document_id": document_id,
         "document_name": document_name,
         "document_type": document_type,
-        "root": hierachy
+        "root": hierarchy
     }
 
     result = trees_collection.insert_one(tree)
@@ -38,7 +38,7 @@ async def generate_tree(document_id: str):
     documents_collection.update_one({"_id": ObjectId(document_id)}, {
                                     "$set": {"tree_id": tree_id}})
 
-    node_paths = extract_all_node_paths(hierachy)
+    node_paths = extract_all_node_paths(hierarchy)
     for node_path in node_paths:
         node_doc = {
             "tree_id": tree_id,
@@ -47,14 +47,14 @@ async def generate_tree(document_id: str):
         }
         nodes_collection.insert_one(node_doc)
 
-    add_paths_to_tree(hierachy)
-    extract_locked_status(hierachy)
+    add_paths_to_tree(hierarchy)
+    extract_locked_status(hierarchy)
 
     # Generate questions in the background
     asyncio.create_task(generate_questions_background(
         tree_id, node_paths, document_text))
 
-    return {"tree_id": tree_id, "root": hierachy}
+    return {"tree_id": tree_id, "root": hierarchy}
 
 
 async def generate_questions_background(tree_id, node_paths, document_text):

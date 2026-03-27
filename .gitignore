@@ -1,6 +1,7 @@
 .env
 *__pycache__/
 .vscode/
+testing.py
 
 
 # Below file is used to perform querion on the database

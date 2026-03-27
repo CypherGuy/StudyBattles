@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CollapsibleTree from '../components/CollapsibleTree';
 
 export default function Home() {
+  const navigate = useNavigate();
+
   const [file, setFile] = useState(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -10,10 +13,18 @@ export default function Home() {
   const [documentId, setDocumentId] = useState(null);
   const [tree, setTree] = useState(null);
   const [treeLoading, setTreeLoading] = useState(false);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [questions, setQuestions] = useState(null);
-  const [questionsLoading, setQuestionsLoading] = useState(false);
-  const [completedNodePaths, setCompletedNodePaths] = useState(new Set());
+  const [sessionId, setSessionId] = useState(null);
+
+  // On mount, restore tree and session from localStorage if available
+  useEffect(() => {
+    const storedSession = localStorage.getItem('session_id');
+    const storedTree = localStorage.getItem('tree_data');
+    if (storedSession && storedTree) {
+      const parsedTree = JSON.parse(storedTree);
+      setSessionId(storedSession);
+      setTree(parsedTree);
+    }
+  }, []);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -39,11 +50,11 @@ export default function Home() {
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles.length > 0) {
       const droppedFile = droppedFiles[0];
-      const validTypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+      const validTypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                          'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
-      
-      if (validTypes.includes(droppedFile.type) || 
-          droppedFile.name.endsWith('.docx') || 
+
+      if (validTypes.includes(droppedFile.type) ||
+          droppedFile.name.endsWith('.docx') ||
           droppedFile.name.endsWith('.pptx')) {
         setFile(droppedFile);
         setMessage('');
@@ -75,7 +86,6 @@ export default function Home() {
 
       if (response.ok) {
         setMessage('File uploaded successfully!');
-        // Store document ID from response if available
         if (data.document_id) {
           setDocumentId(data.document_id);
         }
@@ -113,7 +123,6 @@ export default function Home() {
 
       if (response.ok) {
         setMessage('YouTube video uploaded successfully!');
-        // Store document ID from response if available
         if (data.document_id) {
           setDocumentId(data.document_id);
         }
@@ -128,88 +137,19 @@ export default function Home() {
     }
   };
 
-  const isNodeCompleted = (nodePath) => {
-    return nodePath && completedNodePaths.has(nodePath);
+  // Apply server-side unlock status to tree nodes
+  const applyUnlockStatus = (node, unlockStatus) => {
+    if (node.path && node.path in unlockStatus) {
+      node.locked = unlockStatus[node.path];
+    }
+    if (node.children) {
+      node.children.forEach(child => applyUnlockStatus(child, unlockStatus));
+    }
   };
 
-  const calculateNodeLocked = (node) => {
-    // Leaf nodes (no children) are always unlocked
-    if (!node.children || node.children.length === 0) {
-      return false;
-    }
-    // Node is locked if not all children are completed
-    const allChildrenCompleted = node.children.every(child => {
-      if (!child.path) {
-        console.warn('Node missing path:', child.title);
-        return false; // If missing path, consider uncompleted
-      }
-      return isNodeCompleted(child.path);
-    });
-    return !allChildrenCompleted;
-  };
-
-  const updateTreeWithLockStatus = (node) => {
-    // Recursively update lock status based on completed children
-    if (node.children && node.children.length > 0) {
-      node.children.forEach(child => updateTreeWithLockStatus(child));
-    }
-    node.locked = calculateNodeLocked(node);
-  };
-
-  const handleNodeClick = async (node, depth) => {
-    const level = depth + 1;
-    if (level < 2) return; // Only level 2 and above
-    if (node.locked) return; // Only unlocked nodes
-
-    setSelectedNode(node);
-    setQuestionsLoading(true);
-    setQuestions(null);
-
-    try {
-      // Properly encode the path - encode each segment but keep slashes
-      const encodedPath = node.path
-        .split('/')
-        .map(part => encodeURIComponent(part))
-        .join('/');
-      
-      const url = `http://localhost:8000/api/questions/${tree.tree_id}/${encodedPath}`;
-
-      // Add a timeout to the fetch
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for question generation
-
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setQuestions(data.questions || []);
-      
-      // Mark this node as completed
-      const newCompleted = new Set(completedNodePaths);
-      newCompleted.add(node.path);
-      setCompletedNodePaths(newCompleted);
-      
-      // Update tree with new lock status and trigger re-render
-      if (tree) {
-        const updatedTree = JSON.parse(JSON.stringify(tree)); // Deep copy
-        updateTreeWithLockStatus(updatedTree.root);
-        setTree(updatedTree);
-      }
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        setMessage('Request timed out after 30 seconds. Questions may still be generating.');
-      } else {
-        console.error('Error fetching questions:', error);
-        setMessage(`Error fetching questions: ${error.message}`);
-      }
-      setQuestions([]);
-    } finally {
-      setQuestionsLoading(false);
-    }
+  const handleNodeClick = (node, depth) => {
+    if (depth < 1 || node.locked) return;
+    navigate('/question', { state: { node, treeId: tree.tree_id, sessionId } });
   };
 
   const handleGenerateTree = async () => {
@@ -228,17 +168,28 @@ export default function Home() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        // Update lock status based on completed nodes (initially empty)
-        updateTreeWithLockStatus(data.root);
-        setTree(data);
-        setCompletedNodePaths(new Set()); // Reset completed nodes for new tree
-        setMessage('Tree generated successfully!');
-        setSelectedNode(null);
-        setQuestions(null);
-      } else {
+      if (!response.ok) {
         setMessage(`Error: ${data.error || 'Failed to generate tree'}`);
+        return;
       }
+
+      // Create a session for this tree to track unlock status server-side
+      const sessionRes = await fetch(`http://localhost:8000/session?tree_id=${data.tree_id}`, {
+        method: 'POST',
+      });
+      const sessionData = await sessionRes.json();
+
+      setSessionId(sessionData.session_id);
+
+      // Apply server unlock status to the tree before rendering
+      applyUnlockStatus(data.root, sessionData.node_unlock_status);
+      setTree(data);
+
+      // Persist so state survives navigation back from QuestionScreen
+      localStorage.setItem('session_id', sessionData.session_id);
+      localStorage.setItem('tree_data', JSON.stringify(data));
+
+      setMessage('Tree generated successfully!');
     } catch (error) {
       setMessage(`Error: ${error.message}`);
     } finally {
@@ -246,10 +197,28 @@ export default function Home() {
     }
   };
 
+  const handleRefresh = async () => {
+    if (!sessionId) return;
+
+    try {
+      const res = await fetch(`http://localhost:8000/session/${sessionId}`);
+      const data = await res.json();
+
+      setNodeUnlockStatus(data.node_unlock_status);
+
+      // Re-apply updated unlock status to the tree
+      const updatedTree = JSON.parse(JSON.stringify(tree)); // Deep copy
+      applyUnlockStatus(updatedTree.root, data.node_unlock_status);
+      setTree(updatedTree);
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+    }
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       <h1>StudyBattles</h1>
-      
+
       <div style={{ marginTop: '20px' }}>
         <h2>Upload Document</h2>
         <div
@@ -276,13 +245,13 @@ export default function Home() {
             style={{ marginBottom: '10px' }}
           />
         </div>
-        
+
         {file && (
           <p style={{ marginTop: '10px', fontWeight: 'bold' }}>
             Selected file: {file.name}
           </p>
         )}
-        
+
         <button
           onClick={handleUpload}
           disabled={loading || !file}
@@ -335,38 +304,15 @@ export default function Home() {
       )}
 
       {tree && (
-        <>
-          <div style={{ marginTop: '30px' }}>
-            <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} />
-          </div>
-
-          {selectedNode && (
-            <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #ddd' }}>
-              <h2>{selectedNode.title}</h2>
-              {questionsLoading ? (
-                <p>Loading questions...</p>
-              ) : questions && questions.length > 0 ? (
-                <div>
-                  {questions.map((q, idx) => (
-                    <div key={idx} style={{ marginBottom: '20px', padding: '15px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #eee' }}>
-                      <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Q{idx + 1}: {q.question}</h3>
-                      <div style={{ marginLeft: '20px' }}>
-                        <strong>Answer points:</strong>
-                        <ul style={{ marginTop: '8px' }}>
-                          {q.answer && q.answer.map((ans, i) => (
-                            <li key={i} style={{ marginBottom: '6px' }}>{ans}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p>No questions available for this node.</p>
-              )}
-            </div>
-          )}
-        </>
+        <div style={{ marginTop: '30px' }}>
+          <button
+            onClick={handleRefresh}
+            style={{ marginBottom: '10px', padding: '6px 14px' }}
+          >
+            Refresh unlock status
+          </button>
+          <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} />
+        </div>
       )}
     </div>
   );

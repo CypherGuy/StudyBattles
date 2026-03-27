@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from db import nodes_collection
+from db import nodes_collection, trees_collection, documents_collection
+from bson import ObjectId
 from config import settings
 from openai import OpenAI
 import json
@@ -20,10 +21,19 @@ async def get_questions(tree_id: str, node_path: str):
             max_time_ms=5000
         )
 
-        if node and "questions" in node:
+        if node and node.get("questions"):
             return {"questions": node["questions"]}
 
-        return {"questions": []}
+        # Not generated yet — fetch document text and generate now
+        tree = trees_collection.find_one({"_id": ObjectId(tree_id)})
+        if not tree:
+            return {"questions": []}
+        document = documents_collection.find_one({"_id": ObjectId(tree["document_id"])})
+        if not document:
+            return {"questions": []}
+        result = await generate_questions_and_answers(tree_id, node_path, document["extracted_text"])
+
+        return {"questions": result["questions"] if result else []}
     except Exception as e:
         print(f"[ERROR] Failed to fetch questions: {type(e).__name__}: {e}")
         import traceback

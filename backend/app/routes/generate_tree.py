@@ -1,12 +1,9 @@
 from fastapi import APIRouter
-from .generate_questions import generate_questions_and_answers
-
 from db import documents_collection, trees_collection, nodes_collection, sessions_collection
 from config import settings
 from openai import OpenAI
 import json
 from bson import ObjectId
-import asyncio
 
 
 router = APIRouter()
@@ -19,10 +16,23 @@ async def generate_tree(document_id: str):
     document_type = document["file_type"]
     document_name = document["name"]
 
+    # Return existing tree if already generated for this document
+    existing_tree_id = document.get("tree_id")
+    if existing_tree_id:
+        existing_tree = trees_collection.find_one(
+            {"_id": ObjectId(existing_tree_id)})
+        if existing_tree:
+            root = existing_tree["root"]
+            add_paths_to_tree(root)
+            set_locked_status(root)
+            return {"tree_id": existing_tree_id, "root": root}
+
     hierarchy = generate_hierarchy_from_text(document_text)
     valid, msg = validate_tree(hierarchy)
     if not valid:
         raise ValueError(msg)
+
+    set_locked_status(hierarchy)
 
     # Store in MongoDB
     tree = {
@@ -48,26 +58,16 @@ async def generate_tree(document_id: str):
         nodes_collection.insert_one(node_doc)
 
     add_paths_to_tree(hierarchy)
-    extract_locked_status(hierarchy)
-
-    # Generate questions in the background
-    asyncio.create_task(generate_questions_background(
-        tree_id, node_paths, document_text))
 
     return {"tree_id": tree_id, "root": hierarchy}
 
 
-async def generate_questions_background(tree_id, node_paths, document_text):
-    tasks = [
-        generate_questions_and_answers(tree_id, node_path, document_text)
-        for node_path in node_paths
-    ]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    completed = sum(1 for r in results if r is not None)
-    failed = len(results) - completed
-
-    if failed > 0:
-        print(f"Failed to generate questions for {failed} nodes")
+def set_locked_status(node):
+    # Leaf nodes are unlocked, parents are locked until children are beaten
+    has_children = bool(node.get('children'))
+    node['locked'] = has_children
+    for child in node.get('children', []):
+        set_locked_status(child)
 
 
 def add_paths_to_tree(node, current_path=""):
@@ -83,7 +83,8 @@ def add_paths_to_tree(node, current_path=""):
 
 def extract_locked_status(node):
     ret = {}
-    ret[node['path']] = node['locked']
+    # We have True here because the root node doesn't have a locked status
+    ret[node['path']] = node.get('locked', True)
     if not node['children'] or len(node['children']) == 0:
         ret[node['path']] = False
     else:
@@ -137,7 +138,7 @@ def generate_hierarchy_from_text(text: str, max_depth: int = 4, max_children: in
     prompt = f"""
     Given the study material, and only the following study notes/materials:
 
-    {text[:3000]}
+    {text[:7500]}
 
     Generate a topic hierarchy in JSON format where:
     - The root is the overarching topic
@@ -153,32 +154,26 @@ def generate_hierarchy_from_text(text: str, max_depth: int = 4, max_children: in
     "children": [
         {{
         "title": "Differentiation",
-        "locked": true,
         "children": [
             {{
             "title": "Limits",
-            "locked": false,
             "children": []
             }},
             {{
             "title": "Rate of Change",
-            "locked": false,
             "children": []
             }}
         ]
         }},
         {{
         "title": "Integration",
-        "locked": true,
         "children": [
             {{
             "title": "Antiderivatives",
-            "locked": false,
             "children": []
             }},
             {{
             "title": "Fundamental Theorem",
-            "locked": false,
             "children": []
             }}
         ]

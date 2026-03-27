@@ -43,7 +43,7 @@ export default function QuestionScreen() {
 
   return (
     <div style={{ padding: '20px' }}>
-      <button onClick={() => navigate(-1)} style={{ marginBottom: '20px', padding: '6px 14px' }}>
+      <button onClick={() => navigate('/')} style={{ marginBottom: '20px', padding: '6px 14px' }}>
         ← Back to tree
       </button>
 

@@ -6,3 +6,4 @@ class SessionModel(BaseModel):
     tree_id: str
     session_id: str
     node_unlock_status: Dict[str, bool]
+    node_beaten_status: Dict[str, bool]

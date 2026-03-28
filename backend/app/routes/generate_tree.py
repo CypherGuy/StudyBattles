@@ -83,13 +83,10 @@ def add_paths_to_tree(node, current_path=""):
 
 def extract_locked_status(node):
     ret = {}
-    # We have True here because the root node doesn't have a locked status
-    ret[node['path']] = node.get('locked', True)
-    if not node['children'] or len(node['children']) == 0:
-        ret[node['path']] = False
-    else:
-        for child in node['children']:
-            ret.update(extract_locked_status(child))
+    has_children = bool(node.get('children'))
+    ret[node['path']] = "locked" if has_children else "available"
+    for child in node.get('children', []):
+        ret.update(extract_locked_status(child))
     return ret
 
 

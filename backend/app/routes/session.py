@@ -27,7 +27,7 @@ async def create_session(tree_id: str):
     sessions_collection.insert_one({
         "tree_id": tree_id,
         "session_id": session_id,
-        "node_unlock_status": node_unlock_status
+        "node_unlock_status": node_unlock_status,
     })
 
     return {"session_id": session_id, "node_unlock_status": node_unlock_status}
@@ -35,8 +35,9 @@ async def create_session(tree_id: str):
 
 @router.get("/session/{session_id}")
 async def get_progress_and_unlock_status(session_id):
-    session = sessions_collection.find_one(
-        {"session_id": session_id})
+    session = sessions_collection.find_one({"session_id": session_id})
+    if not session:
+        return {"session_id": session_id, "node_unlock_status": {}}
     node_unlock_status = session["node_unlock_status"]
     return {"session_id": session_id, "node_unlock_status": node_unlock_status}
 
@@ -60,30 +61,33 @@ async def store_attempt_and_check_unlock(session_id: str, attempt: AttemptReques
         {"tree_id": attempt.tree_id, "node_path": attempt.node_path})
     all_questions = [q["question"] for q in node["questions"]]
 
+    all_attempts = list(attempts_collection.find({
+        "session_id": session_id,
+        "node_path": attempt.node_path,
+    }))
     node_beaten = all(
-        attempts_collection.find_one({
-            "session_id": session_id,
-            "node_path": attempt.node_path,
-            "question_text": q,
-            "marks_received": {"$eq": {"$fieldRef": "marks_total"}}
-        }) is not None
+        any(a["question_text"] == q and a["marks_received"] == a["marks_total"]
+            for a in all_attempts)
         for q in all_questions
     )
 
     # If beaten, unlock this node and check if parent should be unlocked too
     session = sessions_collection.find_one({"session_id": session_id})
+    if not session:
+        return {"node_beaten": False, "node_unlock_status": {}, "node_beaten_status": {}}
+
     node_unlock_status = session["node_unlock_status"]
 
     if node_beaten:
-        node_unlock_status[attempt.node_path] = False  # False = unlocked
+        node_unlock_status[attempt.node_path] = "completed"
 
-        # Check if all siblings are beaten — if so, find then unlock the parent
+        # Check if all siblings are completed — if so, unlock the parent
         parent_path = "/".join(attempt.node_path.split("/")[:-1])
         if parent_path:
             siblings = [
                 path for path in node_unlock_status if "/".join(path.split("/")[:-1]) == parent_path]
-            if all(not node_unlock_status[s] for s in siblings):
-                node_unlock_status[parent_path] = False
+            if all(node_unlock_status[s] == "completed" for s in siblings):
+                node_unlock_status[parent_path] = "available"
 
         sessions_collection.update_one(
             {"session_id": session_id},

@@ -93,7 +93,14 @@ export default function QuestionScreen() {
             return (
               <div key={idx} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '4px', border: '1px solid #eee' }}>
                 <h3 style={{ fontSize: '16px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                  <span>Q{idx + 1}: {q.question}</span>
+                  <span>
+                    Q{idx + 1}: {q.question}
+                    {q.type && (
+                      <span style={{ display: 'inline-block', marginLeft: '8px', fontSize: '11px', fontWeight: 'normal', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#e8e8e8', color: '#555', verticalAlign: 'middle' }}>
+                        {q.type}
+                      </span>
+                    )}
+                  </span>
                   <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#888', whiteSpace: 'nowrap' }}>[{q.answer.length} mark{q.answer.length !== 1 ? 's' : ''}]</span>
                 </h3>
 

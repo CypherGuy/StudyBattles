@@ -54,7 +54,9 @@ Use ONLY the following study notes as your source material:
 QUESTION RULES:
 - Every question MUST be answerable using only the study notes above
 - Questions must target the specific leaf topic in the node path, not parent topics
-- Use a mix of question types: definition, explanation, comparison, application, or cause-and-effect
+- Use a mix of question types chosen from this exact list: Definition, Cause and Effect, Application, Comparison, True/False
+- Each question must have a "type" field set to exactly one value from that list.
+- You may mix and match types, but have no more then two of each type per question.
 
 MARK SCHEME RULES:
 - Each key point MUST state a specific fact, mechanism, or named concept
@@ -74,6 +76,7 @@ OUTPUT FORMAT — return this exact JSON structure, nothing else:
 {{
   "questions": [
     {{
+      "type": "Application",
       "question": "State two ways the Computer Misuse Act 1990 constrains the functionality of penetration testing tools.",
       "answer": [
         "Tools must require explicit authorisation from the system owner before initiating any scan or test",

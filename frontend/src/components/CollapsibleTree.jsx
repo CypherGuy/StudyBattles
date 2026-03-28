@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import './CollapsibleTree.css';
 import { ChevronRight, ChevronDown, Lock, Unlock } from 'lucide-react';
 
-const TreeNode = ({ node, parentTitle, depth = 0, onNodeClick }) => {
+const TreeNode = ({ node, parentTitle, depth = 0, onNodeClick, newlyUnlocked = new Set() }) => {
   const [isExpanded, setIsExpanded] = useState(depth < 2); // Auto-expand first 2 levels
   const hasChildren = node.children && node.children.length > 0;
   const levelNumber = depth + 1; // Convert 0-indexed depth to 1-indexed level
+  const isNewlyUnlocked = hasChildren && newlyUnlocked.has(node.path);
 
   const handleClick = () => {
     if (onNodeClick && depth >= 1) { // level 2 and above (depth >= 1)
@@ -34,7 +35,7 @@ const TreeNode = ({ node, parentTitle, depth = 0, onNodeClick }) => {
         </div>
 
         <div
-          className={`node-card ${node.locked ? 'locked' : 'unlocked'} ${depth >= 1 && !node.locked ? 'clickable' : ''}`}
+          className={`node-card ${node.locked ? 'locked' : 'unlocked'} ${depth >= 1 && !node.locked ? 'clickable' : ''} ${isNewlyUnlocked ? 'newly-unlocked' : ''}`}
           onClick={handleClick}
         >
           <div className="node-icon">
@@ -54,6 +55,9 @@ const TreeNode = ({ node, parentTitle, depth = 0, onNodeClick }) => {
             {!node.locked && (
               <div className="node-unlocked">Available</div>
             )}
+            {isNewlyUnlocked && (
+              <div className="node-unlock-banner">Parent topic unlocked!</div>
+            )}
           </div>
           <div className="node-level">{levelNumber}</div>
         </div>
@@ -68,6 +72,7 @@ const TreeNode = ({ node, parentTitle, depth = 0, onNodeClick }) => {
               parentTitle={node.title}
               depth={depth + 1}
               onNodeClick={onNodeClick}
+              newlyUnlocked={newlyUnlocked}
             />
           ))}
         </div>
@@ -76,7 +81,7 @@ const TreeNode = ({ node, parentTitle, depth = 0, onNodeClick }) => {
   );
 };
 
-const CollapsibleTree = ({ treeData, onNodeClick }) => {
+const CollapsibleTree = ({ treeData, onNodeClick, newlyUnlocked = new Set() }) => {
   return (
     <div className="collapsible-tree-container">
       <div className="tree-header">
@@ -84,7 +89,7 @@ const CollapsibleTree = ({ treeData, onNodeClick }) => {
         <p className="tree-subtitle">Green = Unlocked, Red = Locked</p>
       </div>
       <div className="tree-content">
-        <TreeNode node={treeData} depth={0} onNodeClick={onNodeClick} />
+        <TreeNode node={treeData} depth={0} onNodeClick={onNodeClick} newlyUnlocked={newlyUnlocked} />
       </div>
     </div>
   );

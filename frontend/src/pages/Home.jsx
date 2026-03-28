@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CollapsibleTree from '../components/CollapsibleTree';
+import { detectNewlyUnlocked } from '../utils/detectNewlyUnlocked';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function Home() {
   const [tree, setTree] = useState(null);
   const [treeLoading, setTreeLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [newlyUnlocked, setNewlyUnlocked] = useState(new Set());
 
   // On mount, restore tree and session from localStorage if available
   useEffect(() => {
@@ -204,7 +206,9 @@ export default function Home() {
       const res = await fetch(`http://localhost:8000/session/${sessionId}`);
       const data = await res.json();
 
-      setNodeUnlockStatus(data.node_unlock_status);
+      // Detect parent nodes that just transitioned locked→unlocked
+      const justUnlocked = detectNewlyUnlocked(tree.root, data.node_unlock_status);
+      setNewlyUnlocked(justUnlocked);
 
       // Re-apply updated unlock status to the tree
       const updatedTree = JSON.parse(JSON.stringify(tree)); // Deep copy
@@ -311,7 +315,7 @@ export default function Home() {
           >
             Refresh unlock status
           </button>
-          <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} />
+          <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} newlyUnlocked={newlyUnlocked} />
         </div>
       )}
     </div>

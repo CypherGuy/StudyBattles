@@ -307,3 +307,25 @@
     font-size: 0.65rem;
   }
 }
+
+/* Newly-unlocked parent animation */
+@keyframes unlock-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+  50%  { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.node-card.newly-unlocked {
+  animation: unlock-pulse 1s ease-out 2;
+}
+
+.node-unlock-banner {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #16a34a;
+  background: #dcfce7;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-top: 2px;
+  display: inline-block;
+}

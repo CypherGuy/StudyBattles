@@ -131,6 +131,10 @@ export default function QuestionScreen() {
                   const zero = result.marks_received === 0;
                   const scoreColor = full ? 'green' : zero ? 'red' : 'orange';
                   const expanded = showDetails[idx] || false;
+                  const handleTryAgain = () => {
+                    setResults(prev => { const next = { ...prev }; delete next[idx]; return next; });
+                    setUserAnswers(prev => { const next = { ...prev }; delete next[idx]; return next; });
+                  };
                   return (
                     <div style={{ marginTop: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
@@ -142,6 +146,9 @@ export default function QuestionScreen() {
                           style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}
                         >
                           {expanded ? 'Hide details' : 'Show details'}
+                        </button>
+                        <button onClick={handleTryAgain} style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}>
+                          Try again
                         </button>
                       </div>
                       {expanded && (
@@ -169,6 +176,12 @@ export default function QuestionScreen() {
         </div>
       ) : (
         <p>No questions available for this node.</p>
+      )}
+
+      {questions && questions.length > 0 && questions.every((_, idx) => results[idx]) && (
+        <button onClick={() => navigate('/')} style={{ marginTop: '20px', padding: '6px 14px' }}>
+          ← Back to tree
+        </button>
       )}
     </div>
   );

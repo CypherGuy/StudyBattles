@@ -60,6 +60,7 @@ export default function QuestionScreen() {
           node_path: node.path,
           question_text: question.question,
           user_answer: answer,
+          session_id: sessionId,
         }),
       });
       const data = await res.json();

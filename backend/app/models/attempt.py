@@ -3,6 +3,7 @@ from datetime import datetime
 
 
 class AttemptModel(BaseModel):
+    # The full doc that gets stored into MongoDB
     tree_id: str
     session_id: str
     node_path: str
@@ -14,6 +15,7 @@ class AttemptModel(BaseModel):
 
 
 class AttemptRequest(BaseModel):
+    # This is the request we get from the client which we then manipulate into an AttemptModel
     tree_id: str
     node_path: str
     question_text: str

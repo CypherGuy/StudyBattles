@@ -1,6 +1,8 @@
 import json
 
 from fastapi import APIRouter
+from session import store_attempt_and_check_unlock
+from models.attempt import AttemptRequest
 from pydantic import BaseModel
 from openai import OpenAI
 from db import nodes_collection
@@ -15,6 +17,7 @@ class EvaluateRequest(BaseModel):
     node_path: str
     question_text: str
     user_answer: str
+    session_id: str
 
 
 @router.post("/evaluate")
@@ -77,6 +80,15 @@ No markdown, no extra text."""
     results = parsed["results"]
     feedback = parsed["feedback"]
     key_points_hit = [point for point, hit in zip(key_points, results) if hit]
+
+    await store_attempt_and_check_unlock(session_id=request.session_id, attempt=AttemptRequest(
+        tree_id=request.tree_id,
+        node_path=request.node_path,
+        question_text=request.question_text,
+        user_answer=request.user_answer,
+        marks_received=len(key_points_hit),
+        marks_total=len(key_points),
+    ))
 
     return {
         "marks_received": len(key_points_hit),

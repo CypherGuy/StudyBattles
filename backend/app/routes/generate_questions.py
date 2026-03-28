@@ -28,7 +28,8 @@ async def get_questions(tree_id: str, node_path: str):
         tree = trees_collection.find_one({"_id": ObjectId(tree_id)})
         if not tree:
             return {"questions": []}
-        document = documents_collection.find_one({"_id": ObjectId(tree["document_id"])})
+        document = documents_collection.find_one(
+            {"_id": ObjectId(tree["document_id"])})
         if not document:
             return {"questions": []}
         result = await generate_questions_and_answers(tree_id, node_path, document["extracted_text"])
@@ -44,54 +45,51 @@ async def get_questions(tree_id: str, node_path: str):
 async def generate_questions_and_answers(tree_id, node_path, text):
     try:
         client = OpenAI(api_key=settings.openai_api_key)
-        prompt = f"""
-    Given the study material, and only the following study notes/materials:
+        prompt = f"""You are an exam question writer for a student revision app. Generate 3 to 5 exam-style questions strictly about the topic: {node_path}
 
-    {text[:3000]}
+Use ONLY the following study notes as your source material:
 
-    Come up with 3 to 5 questions based on the following node path: {node_path}. You only want to ask questions that revolve around this topic.
+{text[:7500]}
 
-    For example if the path is "AI & Machine Learning Pipelines/Data Sources/Infrastructural Data/Cloud Resource Metrics"
+QUESTION RULES:
+- Every question MUST be answerable using only the study notes above
+- Questions must target the specific leaf topic in the node path, not parent topics
+- Use a mix of question types: definition, explanation, comparison, application, or cause-and-effect
 
-    You only want to ask questions about Cloud Resource Metrics, only using information found in the study notes.
+MARK SCHEME RULES:
+- Each key point MUST state a specific fact, mechanism, or named concept
+- Each key point MUST be independently verifiable
+- NEVER write a key point that only says something "impacts", "affects", or "influences" another thing without explaining HOW or WHAT the specific change is
+- NEVER write a vague summary as a key point
 
-    You may use the following to help come up with acceptable question types:
-    - {question_list[0]}
-    - {question_list[1]}
-    - {question_list[2]}
-    - {question_list[3]}
-    - {question_list[4]}
+BAD key point: "Impacts the design of security testing tools"
+GOOD key point: "Security testing tools must include built-in permission checks to ensure testing is authorised before execution"
 
-    For each question, we need an answer. Generate 1-4 small but relevant key points for what the perfect answer should contain, only taking information from the study notes. Each element in the list should be worth exactly one (1) mark.
-    This means if you want a 2 mark question, you should generate 2 answers.
+BAD key point: "Affects how data is stored"
+GOOD key point: "Personal data must not be retained beyond the period necessary for its original purpose"
 
-    Your output must be in the following JSON format. Continuing with the Cloud Resource Metrics example above, here's an example output:
+Each key point is worth exactly 1 mark. Generate 1-4 key points per question.
+
+OUTPUT FORMAT — return this exact JSON structure, nothing else:
+{{
+  "questions": [
     {{
-        "questions": [
-        {{
-            "question": "What are cloud resource metrics and why are they important for monitoring infrastructure?",
-        "answer": ["Cloud resource metrics track usage and performance", "They help identify bottlenecks or inefficiencies", "They enable cost optimization and capacity planning"]
-        }},
-        {{
-            "question": "Name three examples of cloud resource metrics you would collect from your infrastructure.",
-        "answer": ["CPU utilization", "Memory usage", "Network throughput or disk I/O"]
-        }},
-        {{
-            "question": "Explain how cloud resource metrics differ from application-level metrics.",
-        "answer": ["Cloud metrics focus on infrastructure performance", "Application metrics focus on business logic and user experience", "Cloud metrics are infrastructure-specific while application metrics are domain-specific"]
-        }},
-        {{
-            "question": "What would you do if cloud resource metrics show consistently high CPU usage?",
-        "answer": ["Investigate the root cause of high CPU demand", "Scale resources vertically or horizontally"]
-        }}
-    ]
+      "question": "State two ways the Computer Misuse Act 1990 constrains the functionality of penetration testing tools.",
+      "answer": [
+        "Tools must require explicit authorisation from the system owner before initiating any scan or test",
+        "Tools must limit their scope to systems and IP ranges specified in the authorisation to avoid unauthorised access"
+      ]
     }}
+  ]
+}}
 
-    Do not at any point include a slash (/) in your output, be it question or answer. Do not go off topic, only output JSON without rambling. Return ONLY valid, parseable JSON with no additional text, explanation, or markdown formatting.
-    """
+HARD CONSTRAINTS:
+- Return ONLY valid JSON — no markdown, no explanation, no preamble
+- Do NOT include a forward slash anywhere in questions or answers
+- Do NOT invent facts not present in the study notes"""
 
         response = client.responses.create(
-            model="gpt-5-mini-2025-08-07",
+            model="gpt-5.4-nano",
             input=prompt
         )
 

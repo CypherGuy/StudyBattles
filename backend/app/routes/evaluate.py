@@ -1,7 +1,7 @@
 import json
 
 from fastapi import APIRouter
-from session import store_attempt_and_check_unlock
+from .session import store_attempt_and_check_unlock
 from models.attempt import AttemptRequest
 from pydantic import BaseModel
 from openai import OpenAI
@@ -32,43 +32,25 @@ async def evaluate(request: EvaluateRequest):
 
     key_points = question["answer"]
 
-    prompt = f"""You are marking an exam answer against a mark scheme. Award marks for demonstrating correct understanding of concepts.
+    prompt = f"""You are a strict but encouraging exam marker. Your job is to decide whether each mark scheme point is demonstrated in the student's answer, then give one sentence of feedback.
 
-CORE PRINCIPLES:
-1. Award marks when the student demonstrates they understand the CONCEPT, even if:
-   - They use informal language instead of technical terms
-   - They paraphrase rather than use exact wording
-   - They describe the idea in their own words
+AWARD the mark when the student shows they understand the concept — accept paraphrasing, synonyms, and informal language as long as the underlying idea is correct.
 
-2. DO NOT award marks when:
-   - The concept is fundamentally wrong or confused with something else
-   - They mention related but incorrect ideas
-   - The answer is empty or irrelevant
-   - They use buzzwords without demonstrating understanding
+WITHHOLD the mark when: the concept is factually wrong, confused with another idea, or entirely absent. Buzzwords without demonstrated understanding do not count.
 
-3. TERMINOLOGY FLEXIBILITY:
-   - If a student describes what something does correctly, award the mark even if they don't name it
-   - Accept synonyms and reasonable paraphrases
-   - Focus on whether they GET IT, not whether they memorized exact wording
-
-4. BE STRICT ON:
-   - Factual errors (wrong numbers, wrong outcomes, wrong relationships)
-   - Concept confusion (mixing up two different ideas)
-   - Missing the point entirely
+FEEDBACK RULES:
+- Write directly to the student using "you" (never "the student")
+- Never say things like "According to the study", just say the question
+- One sentence only: acknowledge what they got right (if anything), then state exactly what to add to improve their score
+- Never say they showed "no understanding" — just state what they need to include next time
 
 Student answer: "{request.user_answer}"
 
 Mark scheme points:
 {json.dumps(key_points, indent=2)}
 
-For each mark scheme point, ask yourself: "Does the student demonstrate they understand this concept?"
-If yes → true. If no or unclear → false.
-
-Respond with ONLY a JSON object with two keys:
-- "results": array of booleans (true/false), one per mark scheme point
-- "feedback": one sentence explaining what the student got right and what they should include next time
-
-No markdown, no extra text."""
+Respond with ONLY valid JSON — no markdown, no extra text:
+{{"results": [true/false per mark scheme point], "feedback": "one sentence"}}"""
 
     client = OpenAI(api_key=settings.openai_api_key)
     response = client.responses.create(

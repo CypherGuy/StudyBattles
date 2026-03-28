@@ -13,6 +13,7 @@ export default function QuestionScreen() {
   const [userAnswers, setUserAnswers] = useState({});   // { questionIdx: answerText }
   const [evaluating, setEvaluating] = useState({});     // { questionIdx: bool }
   const [results, setResults] = useState({});           // { questionIdx: { marks_received, marks_total, key_points_hit } }
+  const [showDetails, setShowDetails] = useState({});   // { questionIdx: bool }
 
   useEffect(() => {
     if (!node || !treeId) return;
@@ -91,7 +92,10 @@ export default function QuestionScreen() {
 
             return (
               <div key={idx} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '4px', border: '1px solid #eee' }}>
-                <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Q{idx + 1}: {q.question}</h3>
+                <h3 style={{ fontSize: '16px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                  <span>Q{idx + 1}: {q.question}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#888', whiteSpace: 'nowrap' }}>[{q.answer.length} mark{q.answer.length !== 1 ? 's' : ''}]</span>
+                </h3>
 
                 {!result && (
                   <div style={{ marginTop: '10px' }}>
@@ -115,12 +119,43 @@ export default function QuestionScreen() {
                   </div>
                 )}
 
-                {/* Phase 9 will add results display here */}
-                {result && (
-                  <p style={{ marginTop: '10px', color: 'green' }}>
-                    Submitted — {result.marks_received}/{result.marks_total} marks
-                  </p>
-                )}
+                {result && (() => {
+                  const full = result.marks_received === result.marks_total;
+                  const zero = result.marks_received === 0;
+                  const scoreColor = full ? 'green' : zero ? 'red' : 'orange';
+                  const expanded = showDetails[idx] || false;
+                  return (
+                    <div style={{ marginTop: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                        <p style={{ fontWeight: 'bold', color: scoreColor, fontSize: '18px', margin: 0 }}>
+                          {result.marks_received}/{result.marks_total} marks
+                        </p>
+                        <button
+                          onClick={() => setShowDetails(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                          style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}
+                        >
+                          {expanded ? 'Hide details' : 'Show details'}
+                        </button>
+                      </div>
+                      {expanded && (
+                        <>
+                          <ul style={{ listStyle: 'none', padding: 0, marginBottom: '10px' }}>
+                            {q.answer.map((point, i) => {
+                              const hit = result.key_points_hit.includes(point);
+                              return (
+                                <li key={i} style={{ color: hit ? 'green' : 'red', marginBottom: '4px' }}>
+                                  {hit ? '✓' : '✗'} {point}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          <p style={{ color: '#888', fontSize: '13px', marginBottom: '8px' }}>Your answer: {userAnswers[idx]}</p>
+                          <p style={{ color: '#555', fontStyle: 'italic' }}>{result.feedback}</p>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

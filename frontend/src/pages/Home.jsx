@@ -17,15 +17,28 @@ export default function Home() {
   const [completedNodes, setCompletedNodes] = useState(new Set());
   const [statusChanges, setStatusChanges] = useState([]); // [{ name, status }] from last refresh
 
-  // On mount, restore tree and session from localStorage if available
+  // On mount, restore tree and session from localStorage, then sync unlock status from backend
   useEffect(() => {
     const storedSession = localStorage.getItem('session_id');
     const storedTree = localStorage.getItem('tree_data');
-    if (storedSession && storedTree) {
-      const parsedTree = JSON.parse(storedTree);
-      setSessionId(storedSession);
-      setTree(parsedTree);
-    }
+    if (!storedSession || !storedTree) return;
+
+    const parsedTree = JSON.parse(storedTree);
+    setSessionId(storedSession);
+
+    fetch(`http://localhost:8000/session/${storedSession}`)
+      .then(res => res.json())
+      .then(data => {
+        const updatedTree = JSON.parse(JSON.stringify(parsedTree));
+        applyUnlockStatus(updatedTree.root, data.node_unlock_status);
+        setTree(updatedTree);
+        setCompletedNodes(
+          new Set(Object.keys(data.node_unlock_status).filter(k => data.node_unlock_status[k] === 'completed'))
+        );
+      })
+      .catch(() => {
+        setTree(parsedTree);
+      });
   }, []);
 
   const handleFileChange = (e) => {

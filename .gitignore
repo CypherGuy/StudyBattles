@@ -2,6 +2,7 @@
 *__pycache__/
 .vscode/
 testing.py
+node_modules/*
 
 
 # Below file is used to perform querion on the database

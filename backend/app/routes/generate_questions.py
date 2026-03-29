@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from pydantic import BaseModel
 from db import nodes_collection, trees_collection, documents_collection
 from bson import ObjectId
 from config import settings
@@ -57,7 +58,8 @@ QUESTION RULES:
 - Use a mix of question types chosen from this exact list: Definition, Cause and Effect, Application, Comparison, True/False
 - Each question must have a "type" field set to exactly one value from that list.
 - You may mix and match types, but have no more then two of each type per question.
-- Do not write questions that force you to look at the source material, for example a question like: "In a table T, what does the functional dependency A -> B mean in terms of how values of A relate to values of B?"
+- Do not have questions with misleading topic names, such as "Example Employee Table", as nobody knows what that is, and that that is not an actual learning topic.
+- Do not write questions that force you to look at the source material, unless you provide required context in the question. For example, NEVER say a question like: "In the Employee table, what does the functional dependency A -> B mean in terms of how values of A relate to values of B?". 
 
 MARK SCHEME RULES:
 - Each key point MUST state a specific fact, mechanism, or named concept
@@ -106,6 +108,80 @@ HARD CONSTRAINTS:
             f"ERROR generating questions for {node_path}: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
+        return None
+
+
+class GenerateNewRequest(BaseModel):
+    existing_questions: list[str] = []
+
+
+@router.post("/api/questions/{tree_id}/{node_path:path}/generate-new")
+async def generate_new_question(tree_id: str, node_path: str, body: GenerateNewRequest = GenerateNewRequest()):
+    """Generate a single fresh question, avoiding the questions passed in the request body."""
+    try:
+        tree = trees_collection.find_one({"_id": ObjectId(tree_id)})
+        if not tree:
+            return {"error": "Tree not found"}
+        document = documents_collection.find_one({"_id": ObjectId(tree["document_id"])})
+        if not document:
+            return {"error": "Document not found"}
+
+        question = await _generate_single_question(node_path, document["extracted_text"], body.existing_questions)
+        if not question:
+            return {"error": "Failed to generate question"}
+        return {"question": question}
+    except Exception as e:
+        print(f"ERROR generating new question for {node_path}: {type(e).__name__}: {e}")
+        return {"error": str(e)}
+
+
+async def _generate_single_question(node_path: str, text: str, existing_questions: list[str]) -> dict | None:
+    try:
+        client = OpenAI(api_key=settings.openai_api_key)
+        avoid_block = ""
+        if existing_questions:
+            formatted = "\n".join(f"- {q}" for q in existing_questions)
+            avoid_block = f"\nDo NOT generate any of these already-used questions:\n{formatted}\n"
+
+        prompt = f"""You are an exam question writer for a student revision app. Generate exactly ONE new exam-style question strictly about the topic: {node_path}
+
+Use ONLY the following study notes as your source material:
+
+{text[:7500]}
+{avoid_block}
+QUESTION RULES:
+- The question MUST be answerable using only the study notes above
+- Target the specific leaf topic in the node path, not parent topics
+- Choose a type from: Definition, Cause and Effect, Application, Comparison, True/False
+- The question must have a "type" field set to exactly one value from that list
+
+MARK SCHEME RULES:
+- Each key point MUST state a specific fact, mechanism, or named concept
+- Each key point MUST be independently verifiable
+- NEVER write a vague or impact-only key point without explaining HOW or WHAT
+- Generate 1-4 key points worth 1 mark each
+
+OUTPUT FORMAT — return this exact JSON structure, nothing else:
+{{
+  "questions": [
+    {{
+      "type": "Definition",
+      "question": "Your question here.",
+      "answer": ["Key point one", "Key point two"]
+    }}
+  ]
+}}
+
+HARD CONSTRAINTS:
+- Return ONLY valid JSON — no markdown, no explanation, no preamble
+- Do NOT include a forward slash anywhere in questions or answers
+- Do NOT invent facts not present in the study notes"""
+
+        response = client.responses.create(model="gpt-5.4-nano", input=prompt)
+        parsed = json.loads(response.output_text)
+        return parsed["questions"][0]
+    except Exception as e:
+        print(f"ERROR in _generate_single_question: {type(e).__name__}: {e}")
         return None
 
 

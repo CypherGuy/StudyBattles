@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CollapsibleTree from '../components/CollapsibleTree';
-import { detectNewlyUnlocked } from '../utils/detectNewlyUnlocked';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -15,8 +14,8 @@ export default function Home() {
   const [tree, setTree] = useState(null);
   const [treeLoading, setTreeLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [newlyUnlocked, setNewlyUnlocked] = useState(new Set());
   const [completedNodes, setCompletedNodes] = useState(new Set());
+  const [statusChanges, setStatusChanges] = useState([]); // [{ name, status }] from last refresh
 
   // On mount, restore tree and session from localStorage if available
   useEffect(() => {
@@ -215,8 +214,8 @@ export default function Home() {
     setTree(null);
     setSessionId(null);
     setDocumentId(null);
-    setNewlyUnlocked(new Set());
     setCompletedNodes(new Set());
+    setStatusChanges([]);
     setMessage('');
   };
 
@@ -227,12 +226,19 @@ export default function Home() {
       const res = await fetch(`http://localhost:8000/session/${sessionId}`);
       const data = await res.json();
 
-      // Detect parent nodes that just transitioned locked→unlocked
-      const justUnlocked = detectNewlyUnlocked(tree.root, data.node_unlock_status);
-      setNewlyUnlocked(justUnlocked);
+      // Compute which nodes changed status since last render
+      const changes = [];
+      const walkForChanges = (node) => {
+        const newStatus = data.node_unlock_status[node.path];
+        if (newStatus === 'available' && node.locked) changes.push({ name: node.title, status: 'Available' });
+        if (newStatus === 'completed' && !node.completed) changes.push({ name: node.title, status: 'Completed' });
+        (node.children || []).forEach(walkForChanges);
+      };
+      walkForChanges(tree.root);
+      setStatusChanges(changes);
 
       // Derive completed nodes directly from the node's unlock status
-      setCompletedNodes(new Set(Object.keys(data.node_unlock_status).filter(k => data.node_unlock_status[k] === "completed")));
+      setCompletedNodes(new Set(Object.keys(data.node_unlock_status).filter(k => data.node_unlock_status[k] === 'completed')));
 
       // Re-apply updated unlock status to the tree
       const updatedTree = JSON.parse(JSON.stringify(tree)); // Deep copy
@@ -341,7 +347,19 @@ export default function Home() {
               Reset
             </button>
           </div>
-          <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} newlyUnlocked={newlyUnlocked} completedNodes={completedNodes} />
+          {statusChanges.length > 0 && (
+            <div style={{ marginBottom: '12px', padding: '10px 14px', backgroundColor: '#1e293b', borderRadius: '6px', borderLeft: '3px solid #3b82f6' }}>
+              <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '600', color: '#93c5fd' }}>Updated this refresh:</p>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                {statusChanges.map((c, i) => (
+                  <li key={i} style={{ fontSize: '13px', color: c.status === 'Completed' ? '#60a5fa' : '#4ade80', marginTop: '2px' }}>
+                    {c.status === 'Completed' ? '✓' : '→'} <strong>{c.name}</strong> — {c.status}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} completedNodes={completedNodes} />
         </div>
       )}
     </div>

@@ -15,6 +15,7 @@ export default function QuestionScreen() {
   const [results, setResults] = useState({});           // { questionIdx: { marks_received, marks_total, key_points_hit } }
   const [showDetails, setShowDetails] = useState({});   // { questionIdx: bool }
   const [previouslyCompleted, setPreviouslyCompleted] = useState(new Set()); // set of question texts with prior full marks
+  const [questionOverrides, setQuestionOverrides] = useState({});             // { questionIdx: replacementQuestion }
 
   useEffect(() => {
     if (!node || !treeId) return;
@@ -60,6 +61,27 @@ export default function QuestionScreen() {
     }
   };
 
+  const handleNewQuestion = async (idx) => {
+    try {
+      const encodedPath = encodeURIComponent(node.path);
+      // Send all currently visible question texts so the backend avoids duplicating any of them
+      const currentQuestions = questions.map((q, i) => (questionOverrides[i] || q).question);
+      const res = await fetch(`http://localhost:8000/api/questions/${treeId}/${encodedPath}/generate-new`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ existing_questions: currentQuestions }),
+      });
+      const data = await res.json();
+      if (data.question) {
+        setQuestionOverrides(prev => ({ ...prev, [idx]: data.question }));
+        setResults(prev => { const next = { ...prev }; delete next[idx]; return next; });
+        setUserAnswers(prev => { const next = { ...prev }; delete next[idx]; return next; });
+      }
+    } catch (error) {
+      console.error('Error fetching new question:', error);
+    }
+  };
+
   const handleSubmit = async (question, idx) => {
     const answer = userAnswers[idx] || '';
     if (!answer.trim()) return;
@@ -98,7 +120,8 @@ export default function QuestionScreen() {
         <p>Loading questions...</p>
       ) : questions && questions.length > 0 ? (
         <div>
-          {questions.map((q, idx) => {
+          {questions.map((baseQ, idx) => {
+            const q = questionOverrides[idx] || baseQ;
             const answer = userAnswers[idx] || '';
             const result = results[idx];
             const isEvaluating = evaluating[idx];
@@ -169,6 +192,9 @@ export default function QuestionScreen() {
                         </button>
                         <button onClick={handleTryAgain} style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}>
                           Try again
+                        </button>
+                        <button onClick={() => handleNewQuestion(idx)} style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}>
+                          New question
                         </button>
                       </div>
                       {expanded && (

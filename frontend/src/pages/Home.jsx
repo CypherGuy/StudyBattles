@@ -16,6 +16,7 @@ export default function Home() {
   const [sessionId, setSessionId] = useState(null);
   const [completedNodes, setCompletedNodes] = useState(new Set());
   const [statusChanges, setStatusChanges] = useState([]); // [{ name, status }] from last refresh
+  const [questionsByNode, setQuestionsByNode] = useState({}); // { nodePath: questions[] } prefetched on restore
 
   // On mount, restore tree and session from localStorage, then sync unlock status from backend
   useEffect(() => {
@@ -35,6 +36,26 @@ export default function Home() {
         setCompletedNodes(
           new Set(Object.keys(data.node_unlock_status).filter(k => data.node_unlock_status[k] === 'completed'))
         );
+
+        // Prefetch questions for all non-root unlocked nodes
+        const rootPath = parsedTree.root.path;
+        const unlockedPaths = Object.entries(data.node_unlock_status)
+          .filter(([path, status]) => path !== rootPath && status !== 'locked')
+          .map(([path]) => path);
+
+        Promise.all(
+          unlockedPaths.map(path => {
+            const encodedPath = path.split('/').map(p => encodeURIComponent(p)).join('/');
+            return fetch(`http://localhost:8000/api/questions/${parsedTree.tree_id}/${encodedPath}`)
+              .then(res => res.json())
+              .then(d => [path, d.questions || []])
+              .catch(() => null);
+          })
+        ).then(results => {
+          const qMap = {};
+          results.forEach(entry => { if (entry) qMap[entry[0]] = entry[1]; });
+          setQuestionsByNode(qMap);
+        });
       })
       .catch(() => {
         setTree(parsedTree);
@@ -166,7 +187,7 @@ export default function Home() {
 
   const handleNodeClick = (node, depth) => {
     if (depth < 1 || node.locked) return;
-    navigate('/question', { state: { node, treeId: tree.tree_id, sessionId } });
+    navigate('/question', { state: { node, treeId: tree.tree_id, sessionId, questions: questionsByNode[node.path] || null } });
   };
 
   const handleGenerateTree = async () => {

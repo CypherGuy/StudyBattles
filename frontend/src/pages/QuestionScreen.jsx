@@ -6,7 +6,7 @@ const MAX_CHARS = 1000;
 export default function QuestionScreen() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { node, treeId, sessionId } = state || {};
+  const { node, treeId, sessionId, questions: prefetchedQuestions } = state || {};
 
   const [questions, setQuestions] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,11 @@ export default function QuestionScreen() {
 
   useEffect(() => {
     if (!node || !treeId) return;
-    fetchQuestions();
+    if (prefetchedQuestions) {
+      setQuestions(prefetchedQuestions);
+    } else {
+      fetchQuestions();
+    }
     if (sessionId) fetchCompletedQuestions();
   }, []);
 

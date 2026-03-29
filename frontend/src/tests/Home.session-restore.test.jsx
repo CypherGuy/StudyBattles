@@ -85,4 +85,28 @@ describe('Home — session restore on mount', () => {
 
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  test('prefetches questions for non-root unlocked nodes after session restore', async () => {
+    localStorage.setItem('session_id', SESSION_ID);
+    localStorage.setItem('tree_data', JSON.stringify(storedTree));
+
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        json: () => Promise.resolve({
+          session_id: SESSION_ID,
+          node_unlock_status: { Root: 'available', 'Root/Topic1': 'available' },
+        }),
+      })
+      .mockResolvedValue({
+        json: () => Promise.resolve({ questions: [] }),
+      });
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/questions/tree456/Root/Topic1'
+      );
+    });
+  });
 });

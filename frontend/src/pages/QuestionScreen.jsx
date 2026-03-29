@@ -14,10 +14,12 @@ export default function QuestionScreen() {
   const [evaluating, setEvaluating] = useState({});     // { questionIdx: bool }
   const [results, setResults] = useState({});           // { questionIdx: { marks_received, marks_total, key_points_hit } }
   const [showDetails, setShowDetails] = useState({});   // { questionIdx: bool }
+  const [previouslyCompleted, setPreviouslyCompleted] = useState(new Set()); // set of question texts with prior full marks
 
   useEffect(() => {
     if (!node || !treeId) return;
     fetchQuestions();
+    if (sessionId) fetchCompletedQuestions();
   }, []);
 
   const fetchQuestions = async () => {
@@ -44,6 +46,17 @@ export default function QuestionScreen() {
       setQuestions([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCompletedQuestions = async () => {
+    try {
+      const encodedPath = encodeURIComponent(node.path);
+      const res = await fetch(`http://localhost:8000/session/${sessionId}/completed-questions?node_path=${encodedPath}`);
+      const data = await res.json();
+      setPreviouslyCompleted(new Set(data.completed_questions || []));
+    } catch (error) {
+      console.error('Error fetching completed questions:', error);
     }
   };
 
@@ -101,7 +114,14 @@ export default function QuestionScreen() {
                       </span>
                     )}
                   </span>
-                  <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#888', whiteSpace: 'nowrap' }}>[{q.answer.length} mark{q.answer.length !== 1 ? 's' : ''}]</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                    {previouslyCompleted.has(q.question) && (
+                      <span style={{ fontSize: '11px', fontWeight: '600', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
+                        ✓ Full marks
+                      </span>
+                    )}
+                    <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#888' }}>[{q.answer.length} mark{q.answer.length !== 1 ? 's' : ''}]</span>
+                  </div>
                 </h3>
 
                 {!result && (

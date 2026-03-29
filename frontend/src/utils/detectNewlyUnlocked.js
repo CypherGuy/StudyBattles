@@ -13,7 +13,7 @@ function walk(node, newStatus, result) {
   const hasChildren = node.children && node.children.length > 0;
   const isParent = hasChildren;
   const wasLocked = node.locked === true;
-  const willUnlock = node.path in newStatus && newStatus[node.path] === false;
+  const willUnlock = node.path in newStatus && newStatus[node.path] === "available";
 
   if (isParent && wasLocked && willUnlock) {
     result.add(node.path);

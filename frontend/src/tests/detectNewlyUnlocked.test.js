@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { detectNewlyUnlocked } from '../utils/detectNewlyUnlocked';
 
 describe('detectNewlyUnlocked', () => {
-  test('returns parent node path when it transitions from locked to unlocked', () => {
+  test('returns parent node path when it transitions from locked to available', () => {
     const tree = {
       title: 'Root', path: 'Root', locked: true,
       children: [
@@ -10,7 +10,7 @@ describe('detectNewlyUnlocked', () => {
         { title: 'Child2', path: 'Root/Child2', locked: false, children: [] },
       ],
     };
-    const newStatus = { 'Root': false, 'Root/Child1': false, 'Root/Child2': false };
+    const newStatus = { 'Root': 'available', 'Root/Child1': 'completed', 'Root/Child2': 'completed' };
     const result = detectNewlyUnlocked(tree, newStatus);
     expect(result.has('Root')).toBe(true);
   });
@@ -22,7 +22,7 @@ describe('detectNewlyUnlocked', () => {
         { title: 'Child1', path: 'Root/Child1', locked: true, children: [] },
       ],
     };
-    const newStatus = { 'Root/Child1': false };
+    const newStatus = { 'Root/Child1': 'available' };
     const result = detectNewlyUnlocked(tree, newStatus);
     expect(result.has('Root/Child1')).toBe(false);
   });
@@ -34,7 +34,7 @@ describe('detectNewlyUnlocked', () => {
         { title: 'Child1', path: 'Root/Child1', locked: false, children: [] },
       ],
     };
-    const newStatus = { 'Root': false };
+    const newStatus = { 'Root': 'available' };
     const result = detectNewlyUnlocked(tree, newStatus);
     expect(result.has('Root')).toBe(false);
   });
@@ -51,7 +51,7 @@ describe('detectNewlyUnlocked', () => {
         },
       ],
     };
-    const newStatus = { 'Root/Mid': false };
+    const newStatus = { 'Root/Mid': 'available' };
     const result = detectNewlyUnlocked(tree, newStatus);
     expect(result.has('Root/Mid')).toBe(true);
     expect(result.has('Root')).toBe(false);

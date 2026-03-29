@@ -57,6 +57,7 @@ QUESTION RULES:
 - Use a mix of question types chosen from this exact list: Definition, Cause and Effect, Application, Comparison, True/False
 - Each question must have a "type" field set to exactly one value from that list.
 - You may mix and match types, but have no more then two of each type per question.
+- Do not write questions that force you to look at the source material, for example a question like: "In a table T, what does the functional dependency A -> B mean in terms of how values of A relate to values of B?"
 
 MARK SCHEME RULES:
 - Each key point MUST state a specific fact, mechanism, or named concept

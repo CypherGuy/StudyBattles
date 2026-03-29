@@ -37,10 +37,13 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
+const noCompletedQuestions = { json: () => Promise.resolve({ completed_questions: [] }) };
+
 describe('QuestionScreen — Try again', () => {
   test('shows Try again button after a result is returned', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ json: () => Promise.resolve({ questions: [mockQuestion] }) })
+      .mockResolvedValueOnce(noCompletedQuestions)
       .mockResolvedValueOnce({ json: () => Promise.resolve(mockResult) });
 
     renderQuestionScreen();
@@ -55,6 +58,7 @@ describe('QuestionScreen — Try again', () => {
   test('clicking Try again clears the result and shows the textarea again', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ json: () => Promise.resolve({ questions: [mockQuestion] }) })
+      .mockResolvedValueOnce(noCompletedQuestions)
       .mockResolvedValueOnce({ json: () => Promise.resolve(mockResult) });
 
     renderQuestionScreen();
@@ -75,6 +79,7 @@ describe('QuestionScreen — Back to tree at bottom', () => {
   test('shows a Back to tree button at the bottom once all questions are answered', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ json: () => Promise.resolve({ questions: [mockQuestion] }) })
+      .mockResolvedValueOnce(noCompletedQuestions)
       .mockResolvedValueOnce({ json: () => Promise.resolve(mockResult) });
 
     renderQuestionScreen();

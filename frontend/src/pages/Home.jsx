@@ -202,6 +202,24 @@ export default function Home() {
     }
   };
 
+  const handleReset = async () => {
+    if (sessionId) {
+      try {
+        await fetch(`http://localhost:8000/session/${sessionId}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Error deleting session:', error);
+      }
+    }
+    localStorage.removeItem('session_id');
+    localStorage.removeItem('tree_data');
+    setTree(null);
+    setSessionId(null);
+    setDocumentId(null);
+    setNewlyUnlocked(new Set());
+    setCompletedNodes(new Set());
+    setMessage('');
+  };
+
   const handleRefresh = async () => {
     if (!sessionId) return;
 
@@ -315,12 +333,14 @@ export default function Home() {
 
       {tree && (
         <div style={{ marginTop: '30px' }}>
-          <button
-            onClick={handleRefresh}
-            style={{ marginBottom: '10px', padding: '6px 14px' }}
-          >
-            Refresh unlock status
-          </button>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+            <button onClick={handleRefresh} style={{ padding: '6px 14px' }}>
+              Refresh unlock status
+            </button>
+            <button onClick={handleReset} style={{ padding: '6px 14px', color: '#b91c1c', borderColor: '#b91c1c' }}>
+              Reset
+            </button>
+          </div>
           <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} newlyUnlocked={newlyUnlocked} completedNodes={completedNodes} />
         </div>
       )}

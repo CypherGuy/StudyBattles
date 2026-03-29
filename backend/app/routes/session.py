@@ -42,6 +42,33 @@ async def get_progress_and_unlock_status(session_id):
     return {"session_id": session_id, "node_unlock_status": node_unlock_status}
 
 
+@router.get("/session/{session_id}/completed-questions")
+async def get_full_mark_questions(session_id: str, node_path: str):
+    all_attempts = list(attempts_collection.find({
+        "session_id": session_id,
+        "node_path": node_path,
+    }))
+    completed = [
+        a["question_text"] for a in all_attempts
+        if a["marks_received"] == a["marks_total"]
+    ]
+    return {"completed_questions": list(set(completed))}
+
+
+@router.delete("/session/{session_id}")
+async def delete_session(session_id: str):
+    """Wipe session, all attempts, and the associated tree + nodes."""
+    session = sessions_collection.find_one({"session_id": session_id})
+    if session:
+        tree_id = session.get("tree_id")
+        sessions_collection.delete_one({"session_id": session_id})
+        attempts_collection.delete_many({"session_id": session_id})
+        if tree_id:
+            nodes_collection.delete_many({"tree_id": tree_id})
+            trees_collection.delete_one({"_id": ObjectId(tree_id)})
+    return {"deleted": True}
+
+
 @router.post("/session/{session_id}/attempt")
 async def store_attempt_and_check_unlock(session_id: str, attempt: AttemptRequest):
     # Store the attempt

@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 
+
 class Settings(BaseSettings):
     mongodb_uri: str
     openai_api_key: str
@@ -12,10 +13,12 @@ class Settings(BaseSettings):
 
     rapidapi_key: str
     rapidapi_host: str
+    allowed_origins: str = "http://localhost:5173,https://study-battles.vercel.app"
 
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,
         env_file_encoding="utf-8"
     )
+
 
 settings = Settings()

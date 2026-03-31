@@ -94,7 +94,7 @@ def validate_tree(node, depth=0, max_depth=4, max_children=4):
     if not node.get("title"):
         return False, "Node doesn't have a title"
 
-    if depth > max_depth:
+    if depth >= max_depth:
         return False, f"Tree exceeds max depth of {max_depth}"
 
     children = node.get("children", [])

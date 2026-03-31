@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import API_BASE from '../api';
+import './QuestionScreen.css';
 
 const MAX_CHARS = 1000;
+const CHAR_WARNING = 800;
 
 export default function QuestionScreen() {
   const { state } = useLocation();
@@ -10,12 +13,12 @@ export default function QuestionScreen() {
 
   const [questions, setQuestions] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [userAnswers, setUserAnswers] = useState({});   // { questionIdx: answerText }
-  const [evaluating, setEvaluating] = useState({});     // { questionIdx: bool }
-  const [results, setResults] = useState({});           // { questionIdx: { marks_received, marks_total, key_points_hit } }
-  const [showDetails, setShowDetails] = useState({});   // { questionIdx: bool }
-  const [previouslyCompleted, setPreviouslyCompleted] = useState(new Set()); // set of question texts with prior full marks
-  const [questionOverrides, setQuestionOverrides] = useState({});             // { questionIdx: replacementQuestion }
+  const [activeIdx, setActiveIdx] = useState(0); // which card's textarea is expanded
+  const [userAnswers, setUserAnswers] = useState({});
+  const [evaluating, setEvaluating] = useState({});
+  const [results, setResults] = useState({});
+  const [previouslyCompleted, setPreviouslyCompleted] = useState(new Set());
+  const [questionOverrides, setQuestionOverrides] = useState({});
 
   useEffect(() => {
     if (!node || !treeId) return;
@@ -31,15 +34,12 @@ export default function QuestionScreen() {
     setLoading(true);
     try {
       const encodedPath = node.path.split('/').map(p => encodeURIComponent(p)).join('/');
-
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for question generation
-
-      const res = await fetch(`http://localhost:8000/api/questions/${treeId}/${encodedPath}`, {
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch(`${API_BASE}/api/questions/${treeId}/${encodedPath}`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-
       const data = await res.json();
       setQuestions(data.questions || []);
     } catch (error) {
@@ -57,7 +57,7 @@ export default function QuestionScreen() {
   const fetchCompletedQuestions = async () => {
     try {
       const encodedPath = encodeURIComponent(node.path);
-      const res = await fetch(`http://localhost:8000/session/${sessionId}/completed-questions?node_path=${encodedPath}`);
+      const res = await fetch(`${API_BASE}/session/${sessionId}/completed-questions?node_path=${encodedPath}`);
       const data = await res.json();
       setPreviouslyCompleted(new Set(data.completed_questions || []));
     } catch (error) {
@@ -68,9 +68,8 @@ export default function QuestionScreen() {
   const handleNewQuestion = async (idx) => {
     try {
       const encodedPath = encodeURIComponent(node.path);
-      // Send all currently visible question texts so the backend avoids duplicating any of them
       const currentQuestions = questions.map((q, i) => (questionOverrides[i] || q).question);
-      const res = await fetch(`http://localhost:8000/api/questions/${treeId}/${encodedPath}/generate-new`, {
+      const res = await fetch(`${API_BASE}/api/questions/${treeId}/${encodedPath}/generate-new`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ existing_questions: currentQuestions }),
@@ -80,6 +79,7 @@ export default function QuestionScreen() {
         setQuestionOverrides(prev => ({ ...prev, [idx]: data.question }));
         setResults(prev => { const next = { ...prev }; delete next[idx]; return next; });
         setUserAnswers(prev => { const next = { ...prev }; delete next[idx]; return next; });
+        setActiveIdx(idx);
       }
     } catch (error) {
       console.error('Error fetching new question:', error);
@@ -92,7 +92,7 @@ export default function QuestionScreen() {
 
     setEvaluating(prev => ({ ...prev, [idx]: true }));
     try {
-      const res = await fetch('http://localhost:8000/evaluate', {
+      const res = await fetch(`${API_BASE}/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -112,127 +112,193 @@ export default function QuestionScreen() {
     }
   };
 
+  const handleTryAgain = (idx) => {
+    setResults(prev => { const next = { ...prev }; delete next[idx]; return next; });
+    setUserAnswers(prev => { const next = { ...prev }; delete next[idx]; return next; });
+    setActiveIdx(idx);
+  };
+
+  // Derived progress
+  const totalQ = questions ? questions.length : 0;
+  const answeredCount = Object.keys(results).length;
+  const totalEarned = Object.values(results).reduce((s, r) => s + r.marks_received, 0);
+  const totalPossible = questions
+    ? questions.reduce((s, q, i) => s + (questionOverrides[i] || q).answer.length, 0)
+    : 0;
+  const allDone = questions && questions.length > 0 && questions.every((_, i) => results[i]);
+
+  const getPipClass = (result, i) => {
+    if (!result) return 'pip-unanswered';
+    if (i >= result.marks_received) return 'pip-empty';
+    const full = result.marks_received === result.marks_total;
+    const zero = result.marks_received === 0;
+    if (full) return 'pip-filled-green';
+    if (zero) return 'pip-filled-red';
+    return 'pip-filled-amber';
+  };
+
+  const getCardStateClass = (result, isActive) => {
+    if (!result) return isActive ? 'q-card-active' : '';
+    const full = result.marks_received === result.marks_total;
+    const zero = result.marks_received === 0;
+    if (full) return 'q-card-success';
+    if (zero) return 'q-card-fail';
+    return 'q-card-partial';
+  };
+
+  const getScoreClass = (result) => {
+    const full = result.marks_received === result.marks_total;
+    const zero = result.marks_received === 0;
+    if (full) return 'q-score-success';
+    if (zero) return 'q-score-fail';
+    return 'q-score-partial';
+  };
+
   return (
-    <div style={{ padding: '20px' }}>
-      <button onClick={() => navigate('/')} style={{ marginBottom: '20px', padding: '6px 14px' }}>
-        ← Back to tree
-      </button>
+    <div className="qs-page">
 
-      <h2>{node?.title}</h2>
+      {/* ── Sticky header ── */}
+      <header className="qs-header">
+        <button className="qs-back-btn" onClick={() => navigate('/')}>
+          ← Back to tree
+        </button>
+        {node && <span className="qs-node-title">{node.title}</span>}
+        {questions && (
+          <span className="qs-progress">
+            <strong>{answeredCount}/{totalQ}</strong> answered
+            {' · '}
+            <strong>{totalEarned}/{totalPossible}</strong> marks
+          </span>
+        )}
+      </header>
 
-      {loading ? (
-        <p>Loading questions...</p>
-      ) : questions && questions.length > 0 ? (
-        <div>
-          {questions.map((baseQ, idx) => {
-            const q = questionOverrides[idx] || baseQ;
-            const answer = userAnswers[idx] || '';
-            const result = results[idx];
-            const isEvaluating = evaluating[idx];
+      {/* ── Body ── */}
+      <div className="qs-body">
+        {loading ? (
+          <div className="qs-loading">Loading questions…</div>
+        ) : questions && questions.length > 0 ? (
+          <>
+            {questions.map((baseQ, idx) => {
+              const q = questionOverrides[idx] || baseQ;
+              const answer = userAnswers[idx] || '';
+              const result = results[idx];
+              const isEvaluating = evaluating[idx];
+              const isActive = activeIdx === idx && !result;
+              const cardStateClass = getCardStateClass(result, isActive);
 
-            return (
-              <div key={idx} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '4px', border: '1px solid #eee' }}>
-                <h3 style={{ fontSize: '16px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                  <span>
-                    Q{idx + 1}: {q.question}
-                    {q.type && (
-                      <span style={{ display: 'inline-block', marginLeft: '8px', fontSize: '11px', fontWeight: 'normal', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#e8e8e8', color: '#555', verticalAlign: 'middle' }}>
-                        {q.type}
-                      </span>
-                    )}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                    {previouslyCompleted.has(q.question) && (
-                      <span style={{ fontSize: '11px', fontWeight: '600', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
-                        ✓ Full marks
-                      </span>
-                    )}
-                    <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#888' }}>[{q.answer.length} mark{q.answer.length !== 1 ? 's' : ''}]</span>
-                  </div>
-                </h3>
-
-                {!result && (
-                  <div style={{ marginTop: '10px' }}>
-                    <textarea
-                      value={answer}
-                      onChange={e => setUserAnswers(prev => ({ ...prev, [idx]: e.target.value.slice(0, MAX_CHARS) }))}
-                      placeholder="Type your answer here..."
-                      disabled={isEvaluating}
-                      style={{ width: '100%', minHeight: '80px', padding: '8px', boxSizing: 'border-box', resize: 'vertical' }}
-                    />
-                    <div style={{ fontSize: '12px', color: answer.length >= MAX_CHARS ? 'red' : '#888', textAlign: 'right' }}>
-                      {answer.length} / {MAX_CHARS}
+              return (
+                <div
+                  key={idx}
+                  className={`q-card ${cardStateClass} ${!result && !isActive ? 'q-card-clickable' : ''}`}
+                  onClick={!result && !isActive ? () => setActiveIdx(idx) : undefined}
+                >
+                  {/* Card header — always visible */}
+                  <div className="q-card-head">
+                    <div className="q-num">{idx + 1}</div>
+                    <div className="q-head-main">
+                      <div className="q-question-text">{q.question}</div>
+                      <div className="q-badges">
+                        {q.type && <span className="q-type-badge">{q.type}</span>}
+                        <span className="q-pips">
+                          {Array.from({ length: q.answer.length }, (_, i) => (
+                            <span key={i} className={`pip ${getPipClass(result, i)}`} />
+                          ))}
+                        </span>
+                        <span className="q-marks-text">
+                          {q.answer.length} mark{q.answer.length !== 1 ? 's' : ''}
+                        </span>
+                        {previouslyCompleted.has(q.question) && (
+                          <span className="q-full-marks-badge">✓ Full marks</span>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleSubmit(q, idx)}
-                      disabled={isEvaluating || !answer.trim()}
-                      style={{ marginTop: '8px', padding: '6px 16px' }}
-                    >
-                      {isEvaluating ? 'Evaluating...' : 'Submit'}
-                    </button>
+                    {result && (
+                      <span className={`q-score-badge ${getScoreClass(result)}`}>
+                        {result.marks_received}/{result.marks_total}
+                      </span>
+                    )}
                   </div>
-                )}
 
-                {result && (() => {
-                  const full = result.marks_received === result.marks_total;
-                  const zero = result.marks_received === 0;
-                  const scoreColor = full ? 'green' : zero ? 'red' : 'orange';
-                  const expanded = showDetails[idx] || false;
-                  const handleTryAgain = () => {
-                    setResults(prev => { const next = { ...prev }; delete next[idx]; return next; });
-                    setUserAnswers(prev => { const next = { ...prev }; delete next[idx]; return next; });
-                  };
-                  return (
-                    <div style={{ marginTop: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                        <p style={{ fontWeight: 'bold', color: scoreColor, fontSize: '18px', margin: 0 }}>
-                          {result.marks_received}/{result.marks_total} marks
-                        </p>
+                  {/* Answer area — shown when card is active */}
+                  {isActive && !isEvaluating && (
+                    <div className="q-answer-area">
+                      <textarea
+                        className="q-textarea"
+                        value={answer}
+                        onChange={e => setUserAnswers(prev => ({ ...prev, [idx]: e.target.value.slice(0, MAX_CHARS) }))}
+                        onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                        placeholder="Type your answer here..."
+                        disabled={isEvaluating}
+                      />
+                      <div className="q-answer-footer">
+                        {answer.length >= CHAR_WARNING && (
+                          <span className={`q-char-count ${answer.length >= MAX_CHARS ? 'at-limit' : 'near-limit'}`}>
+                            {answer.length} / {MAX_CHARS}
+                          </span>
+                        )}
                         <button
-                          onClick={() => setShowDetails(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                          style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}
+                          className="q-submit-btn"
+                          onClick={e => { e.stopPropagation(); handleSubmit(q, idx); }}
+                          disabled={!answer.trim()}
                         >
-                          {expanded ? 'Hide details' : 'Show details'}
+                          Submit
                         </button>
-                        <button onClick={handleTryAgain} style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}>
+                      </div>
+                    </div>
+                  )}
+
+                  {isEvaluating && (
+                    <div className="q-answer-area">
+                      <div className="q-evaluating">Evaluating…</div>
+                    </div>
+                  )}
+
+                  {/* Result area */}
+                  {result && (
+                    <div className="q-result-area">
+                      <ul className="q-key-points">
+                        {q.answer.map((point, i) => {
+                          const hit = result.key_points_hit.includes(point);
+                          return (
+                            <li key={i} className={`q-key-point ${hit ? 'q-point-hit' : 'q-point-miss'}`}>
+                              <span className="q-point-icon">{hit ? '✓' : '✗'}</span>
+                              <span className="q-point-text">{point}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <p className="q-your-answer">Your answer: {userAnswers[idx]}</p>
+                      <p className="q-feedback">{result.feedback}</p>
+                      <div className="q-result-actions">
+                        <button className="q-ghost-btn" onClick={() => handleTryAgain(idx)}>
                           Try again
                         </button>
-                        <button onClick={() => handleNewQuestion(idx)} style={{ fontSize: '12px', padding: '2px 10px', cursor: 'pointer' }}>
+                        <button className="q-ghost-btn" onClick={() => handleNewQuestion(idx)}>
                           New question
                         </button>
                       </div>
-                      {expanded && (
-                        <>
-                          <ul style={{ listStyle: 'none', padding: 0, marginBottom: '10px' }}>
-                            {q.answer.map((point, i) => {
-                              const hit = result.key_points_hit.includes(point);
-                              return (
-                                <li key={i} style={{ color: hit ? 'green' : 'red', marginBottom: '4px' }}>
-                                  {hit ? '✓' : '✗'} {point}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                          <p style={{ color: '#888', fontSize: '13px', marginBottom: '8px' }}>Your answer: {userAnswers[idx]}</p>
-                          <p style={{ color: '#555', fontStyle: 'italic' }}>{result.feedback}</p>
-                        </>
-                      )}
                     </div>
-                  );
-                })()}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p>No questions available for this node.</p>
-      )}
+                  )}
+                </div>
+              );
+            })}
 
-      {questions && questions.length > 0 && questions.every((_, idx) => results[idx]) && (
-        <button onClick={() => navigate('/')} style={{ marginTop: '20px', padding: '6px 14px' }}>
-          ← Back to tree
-        </button>
-      )}
+            {allDone && (
+              <div className="qs-done-banner">
+                <div className="qs-done-score">{totalEarned}/{totalPossible}</div>
+                <p className="qs-done-label">marks earned on this topic</p>
+                <button className="qs-done-back" onClick={() => navigate('/')}>
+                  ← Back to tree
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <p style={{ color: 'var(--h-text-2)', padding: '48px 0', textAlign: 'center' }}>
+            No questions available for this node.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CollapsibleTree from '../components/CollapsibleTree';
+import API_BASE from '../api';
+import './Home.css';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -17,6 +19,8 @@ export default function Home() {
   const [completedNodes, setCompletedNodes] = useState(new Set());
   const [statusChanges, setStatusChanges] = useState([]); // [{ name, status }] from last refresh
   const [questionsByNode, setQuestionsByNode] = useState({}); // { nodePath: questions[] } prefetched on restore
+  const [uploadMode, setUploadMode] = useState('file'); // 'file' | 'youtube'
+  const [resetting, setResetting] = useState(false);
 
   // On mount, restore tree and session from localStorage, then sync unlock status from backend
   useEffect(() => {
@@ -27,8 +31,11 @@ export default function Home() {
     const parsedTree = JSON.parse(storedTree);
     setSessionId(storedSession);
 
-    fetch(`http://localhost:8000/session/${storedSession}`)
-      .then(res => res.json())
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    fetch(`${API_BASE}/session/${storedSession}`, { signal: controller.signal })
+      .then(res => { clearTimeout(timeoutId); return res.json(); })
       .then(data => {
         const updatedTree = JSON.parse(JSON.stringify(parsedTree));
         applyUnlockStatus(updatedTree.root, data.node_unlock_status);
@@ -46,7 +53,7 @@ export default function Home() {
         Promise.all(
           unlockedPaths.map(path => {
             const encodedPath = path.split('/').map(p => encodeURIComponent(p)).join('/');
-            return fetch(`http://localhost:8000/api/questions/${parsedTree.tree_id}/${encodedPath}`)
+            return fetch(`${API_BASE}/api/questions/${parsedTree.tree_id}/${encodedPath}`)
               .then(res => res.json())
               .then(d => [path, d.questions || []])
               .catch(() => null);
@@ -113,7 +120,7 @@ export default function Home() {
     formData.append('files', file);
 
     try {
-      const response = await fetch('http://localhost:8000/upload', {
+      const response = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -150,7 +157,7 @@ export default function Home() {
     formData.append('url', youtubeUrl);
 
     try {
-      const response = await fetch('http://localhost:8000/upload', {
+      const response = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -200,7 +207,7 @@ export default function Home() {
     setMessage('Generating learning tree...');
 
     try {
-      const response = await fetch(`http://localhost:8000/generate-tree?document_id=${documentId}`, {
+      const response = await fetch(`${API_BASE}/generate-tree?document_id=${documentId}`, {
         method: 'POST',
       });
 
@@ -212,7 +219,7 @@ export default function Home() {
       }
 
       // Create a session for this tree to track unlock status server-side
-      const sessionRes = await fetch(`http://localhost:8000/session?tree_id=${data.tree_id}`, {
+      const sessionRes = await fetch(`${API_BASE}/session?tree_id=${data.tree_id}`, {
         method: 'POST',
       });
       const sessionData = await sessionRes.json();
@@ -236,9 +243,11 @@ export default function Home() {
   };
 
   const handleReset = async () => {
+    if (resetting) return;
+    setResetting(true);
     if (sessionId) {
       try {
-        await fetch(`http://localhost:8000/session/${sessionId}`, { method: 'DELETE' });
+        await fetch(`${API_BASE}/session/${sessionId}`, { method: 'DELETE' });
       } catch (error) {
         console.error('Error deleting session:', error);
       }
@@ -257,7 +266,7 @@ export default function Home() {
     if (!sessionId) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/session/${sessionId}`);
+      const res = await fetch(`${API_BASE}/session/${sessionId}`);
       const data = await res.json();
 
       // Compute which nodes changed status since last render
@@ -284,115 +293,172 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>StudyBattles</h1>
+    <div className="home-page">
 
-      <div style={{ marginTop: '20px' }}>
-        <h2>Upload Document</h2>
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          style={{
-            padding: '40px',
-            border: '2px dashed #ccc',
-            borderRadius: '8px',
-            textAlign: 'center',
-            backgroundColor: dragOver ? '#f0f0f0' : 'transparent',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-          }}
-        >
-          <p>Drag and drop your .docx or .pptx files here, or use the input below</p>
-          <input
-            id="fileInput"
-            type="file"
-            accept=".docx,.pptx"
-            onChange={handleFileChange}
-            disabled={loading}
-            style={{ marginBottom: '10px' }}
-          />
+      {/* ── Header ── */}
+      <header className="home-header">
+        <h1 className="home-logo">Study<em>Battles</em></h1>
+        <div className="home-logo-divider" />
+      </header>
+
+      {/* ── Upload card ── */}
+      {!tree && (
+        <div className="upload-card">
+
+          {/* Tab strip */}
+          <div className="upload-tabs">
+            <button
+              className={`upload-tab${uploadMode === 'file' ? ' active' : ''}`}
+              onClick={() => setUploadMode('file')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+              </svg>
+              Document
+            </button>
+            <button
+              className={`upload-tab${uploadMode === 'youtube' ? ' active' : ''}`}
+              onClick={() => setUploadMode('youtube')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.96-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" />
+                <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" />
+              </svg>
+              YouTube
+            </button>
+          </div>
+
+          {/* File tab */}
+          {uploadMode === 'file' && (
+            <div className="file-tab-body">
+              <div
+                className={`drop-zone${dragOver ? ' drag-active' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div className="drop-zone-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
+                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                  </svg>
+                </div>
+                <p className="drop-zone-label">
+                  Drop your file here or <span>browse</span>
+                </p>
+                <p className="drop-zone-hint">.docx and .pptx supported</p>
+                <input
+                  id="fileInput"
+                  type="file"
+                  accept=".docx,.pptx"
+                  onChange={handleFileChange}
+                  disabled={loading}
+                />
+              </div>
+
+              {file && (
+                <div className="file-chip">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <span className="file-chip-name">{file.name}</span>
+                  <button className="file-chip-clear" onClick={() => { setFile(null); document.getElementById('fileInput').value = ''; }}>×</button>
+                </div>
+              )}
+
+              <div className="file-tab-footer">
+                <button className="btn-upload" onClick={handleUpload} disabled={loading || !file}>
+                  {loading ? 'Uploading…' : 'Upload'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* YouTube tab */}
+          {uploadMode === 'youtube' && (
+            <div className="yt-tab-body">
+              <p className="yt-field-label">Video URL</p>
+              <div className="yt-input-row">
+                <input
+                  type="text"
+                  className="yt-input"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  disabled={loading}
+                />
+                <button className="btn-upload" onClick={handleYoutubeUpload} disabled={loading}>
+                  {loading ? 'Uploading…' : 'Upload'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+      )}
 
-        {file && (
-          <p style={{ marginTop: '10px', fontWeight: 'bold' }}>
-            Selected file: {file.name}
-          </p>
-        )}
+      {/* ── Status message ── */}
+      {message && (
+        <div className={`status-msg${message.includes('Error') ? ' error' : ' success'}`}>
+          <span className="status-dot" />
+          {message}
+        </div>
+      )}
 
-        <button
-          onClick={handleUpload}
-          disabled={loading || !file}
-          style={{ marginTop: '10px', padding: '8px 16px' }}
-        >
-          {loading ? 'Uploading...' : 'Upload'}
-        </button>
-      </div>
-
-      <div style={{ marginTop: '30px' }}>
-        <h2>Upload YouTube Video</h2>
-        <input
-          type="text"
-          placeholder="https://www.youtube.com/watch?v=..."
-          value={youtubeUrl}
-          onChange={(e) => setYoutubeUrl(e.target.value)}
-          disabled={loading}
-          style={{ padding: '8px', width: '350px' }}
-        />
-        <button
-          onClick={handleYoutubeUpload}
-          disabled={loading}
-          style={{ marginLeft: '10px', padding: '8px 16px' }}
-        >
-          {loading ? 'Uploading...' : 'Upload'}
-        </button>
-      </div>
-
-      {documentId && (
-        <div style={{ marginTop: '30px' }}>
-          <h2>Generate Learning Tree</h2>
-          <button
-            onClick={handleGenerateTree}
-            disabled={treeLoading}
-            style={{ padding: '8px 16px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            {treeLoading ? 'Generating...' : 'Generate Tree'}
+      {/* ── Generate Tree ── */}
+      {documentId && !tree && (
+        <div className="generate-section">
+          <div className="generate-section-text">
+            <p className="generate-section-title">Ready to generate</p>
+            <p className="generate-section-sub">Build your personalised learning tree from the uploaded content</p>
+          </div>
+          <button className="btn-generate" onClick={handleGenerateTree} disabled={treeLoading}>
+            {treeLoading ? (
+              <>Generating…</>
+            ) : (
+              <>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
+                </svg>
+                Generate Tree
+              </>
+            )}
           </button>
         </div>
       )}
 
-      {message && (
-        <p style={{
-          marginTop: '20px',
-          color: message.includes('Error') ? 'red' : 'green',
-          fontSize: '16px'
-        }}>
-          {message}
-        </p>
-      )}
-
+      {/* ── Tree view ── */}
       {tree && (
-        <div style={{ marginTop: '30px' }}>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-            <button onClick={handleRefresh} style={{ padding: '6px 14px' }}>
+        <div style={{ marginTop: '8px' }}>
+          <div className="tree-toolbar">
+            <button className="btn-toolbar" onClick={handleRefresh}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
               Refresh unlock status
             </button>
-            <button onClick={handleReset} style={{ padding: '6px 14px', color: '#b91c1c', borderColor: '#b91c1c' }}>
+            <button className="btn-toolbar danger" onClick={handleReset} disabled={resetting}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
               Reset
             </button>
           </div>
+
           {statusChanges.length > 0 && (
-            <div style={{ marginBottom: '12px', padding: '10px 14px', backgroundColor: '#1e293b', borderRadius: '6px', borderLeft: '3px solid #3b82f6' }}>
-              <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '600', color: '#93c5fd' }}>Updated this refresh:</p>
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+            <div className="status-changes-banner">
+              <p className="status-changes-title">Updated this refresh</p>
+              <ul className="status-changes-list">
                 {statusChanges.map((c, i) => (
-                  <li key={i} style={{ fontSize: '13px', color: c.status === 'Completed' ? '#60a5fa' : '#4ade80', marginTop: '2px' }}>
+                  <li key={i} style={{ color: c.status === 'Completed' ? '#60a5fa' : '#4ade80' }}>
                     {c.status === 'Completed' ? '✓' : '→'} <strong>{c.name}</strong> — {c.status}
                   </li>
                 ))}
               </ul>
             </div>
           )}
+
           <CollapsibleTree treeData={tree.root} onNodeClick={handleNodeClick} completedNodes={completedNodes} />
         </div>
       )}

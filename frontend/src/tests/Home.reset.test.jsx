@@ -6,6 +6,7 @@ import Home from '../pages/Home';
 beforeEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
+  global.fetch = vi.fn().mockRejectedValue(new Error('network'));
 });
 
 function renderHome() {

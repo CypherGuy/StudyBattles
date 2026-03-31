@@ -1,55 +1,69 @@
 .collapsible-tree-container {
   width: 100%;
-  background: #f5f5f5;
-  padding: 2rem 1.5rem;
-  border-radius: 8px;
-  min-height: 400px;
+  font-family: 'Outfit', system-ui, sans-serif;
 }
 
+/* ── Header ─────────────────────────────────────────── */
 .tree-header {
-  margin-bottom: 2rem;
-  text-align: center;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 6px;
 }
 
 .tree-header h2 {
-  color: #333;
-  font-size: 1.3rem;
-  margin: 0 0 0.5rem 0;
+  font-size: 11px;
   font-weight: 600;
-}
-
-.tree-subtitle {
-  color: #666;
-  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.25);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
   margin: 0;
 }
 
+.tree-subtitle {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.15);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tree-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.04em;
+}
+
+.tree-legend-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+/* ── Scroll area ────────────────────────────────────── */
 .tree-content {
-  max-height: 70vh;
+  max-height: 72vh;
   overflow-y: auto;
-  padding-right: 8px;
+  padding: 2px 0 8px;
 }
 
-.tree-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.tree-content::-webkit-scrollbar-track {
-  background: #f0f0f0;
-  border-radius: 10px;
-}
-
+.tree-content::-webkit-scrollbar { width: 4px; }
+.tree-content::-webkit-scrollbar-track { background: transparent; }
 .tree-content::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
 }
-
 .tree-content::-webkit-scrollbar-thumb:hover {
-  background: #aaa;
+  background: rgba(255, 255, 255, 0.14);
 }
 
+/* ── Tree structure ─────────────────────────────────── */
 .tree-node-wrapper {
   display: flex;
   flex-direction: column;
@@ -58,276 +72,181 @@
 .tree-node-line {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 1px;
+  height: 28px;
+  padding: 0 2px;
 }
 
-.node-controls {
+/* Children container with guide line */
+.children-container {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
+  flex-direction: column;
+  margin-left: 14px;
+  padding-left: 9px;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* ── Expand toggle ──────────────────────────────────── */
 .expand-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: #e8e8e8;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  color: #333;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.22);
   cursor: pointer;
-  transition: all 0.2s ease;
+  border-radius: 3px;
   padding: 0;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
 }
 
 .expand-button:hover {
-  background: #d8d8d8;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .expand-spacer {
-  width: 32px;
-  height: 32px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
+/* ── Node card (the row content) ────────────────────── */
 .node-card {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: white;
-  border-radius: 4px;
-  border-left: 3px solid;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  gap: 6px;
+  padding: 0 8px 0 5px;
+  height: 26px;
+  border-radius: 5px;
   flex: 1;
-  min-width: 200px;
-}
-
-.node-card:hover {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  min-width: 0;
+  cursor: default;
+  transition: background 0.1s;
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 
 .node-card.clickable {
   cursor: pointer;
 }
 
-.node-card.clickable:hover {
-  background-color: #f9f9f9;
-  border-left-width: 4px;
+.node-card:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
+.node-card.clickable:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Status-specific row tints ──────────────────────── */
 .node-card.locked {
-  border-left-color: #d32f2f;
-  background: #fff5f5;
+  background: transparent;
+  border: none;
 }
 
 .node-card.unlocked {
-  border-left-color: #388e3c;
-  background: #f5fff5;
+  background: transparent;
+  border: none;
 }
 
+.node-card.completed {
+  background: transparent;
+  border: none;
+}
+
+/* ── Icon ───────────────────────────────────────────── */
 .node-icon {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
   flex-shrink: 0;
 }
 
-.lock-icon {
-  color: #d32f2f;
-}
+.lock-icon   { color: rgba(248, 113, 113, 0.55); }
+.unlock-icon { color: rgba(74, 222, 128, 0.65);  }
+.node-card.completed .unlock-icon { color: rgba(96, 165, 250, 0.75); }
 
-.unlock-icon {
-  color: #388e3c;
-}
-
+/* ── Title ──────────────────────────────────────────── */
 .node-content {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .node-title {
-  font-weight: 600;
-  color: #333;
-  font-size: 0.95rem;
-  word-break: break-word;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(238, 238, 242, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
 }
 
-.node-card.locked .node-title {
-  color: #d32f2f;
-}
+.node-card.locked    .node-title { color: rgba(248, 113, 113, 0.6);  }
+.node-card.completed .node-title { color: rgba(147, 197, 253, 0.9);  }
+.node-card.unlocked:not(.completed) .node-title { color: rgba(238, 238, 242, 0.85); }
 
-.node-card.unlocked .node-title {
-  color: #388e3c;
-}
-
+/* ── Inline badges ──────────────────────────────────── */
 .node-prereq {
-  font-size: 0.7rem;
-  color: #666;
-  font-style: italic;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  font-style: normal;
+  flex-shrink: 0;
 }
 
 .node-unlocked {
-  font-size: 0.65rem;
+  font-size: 9.5px;
   font-weight: 600;
-  color: #388e3c;
+  color: rgba(52, 211, 153, 0.8);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
 }
 
+.node-completed {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: rgba(96, 165, 250, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+/* ── Level badge ────────────────────────────────────── */
 .node-level {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  background: #e3f2fd;
-  color: #1976d2;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
-.children-container {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* Responsive design */
+/* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {
-  .collapsible-tree-container {
-    padding: 1.5rem 1rem;
-  }
-
-  .tree-header h2 {
-    font-size: 1.1rem;
-  }
-
-  .tree-subtitle {
-    font-size: 0.75rem;
-  }
-
-  .tree-content {
-    max-height: 60vh;
-  }
-
-  .tree-node-line {
-    gap: 0.25rem;
-    margin-bottom: 0.4rem;
-  }
-
-  .node-controls {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-  }
-
-  .expand-button {
-    width: 28px;
-    height: 28px;
-  }
-
-  .expand-spacer {
-    width: 28px;
-    height: 28px;
-  }
-
-  .node-card {
-    padding: 0.6rem 0.8rem;
-    font-size: 0.9rem;
-    gap: 0.6rem;
-    min-width: 160px;
-  }
-
-  .node-title {
-    font-size: 0.85rem;
-  }
-
-  .node-icon {
-    width: 24px;
-    height: 24px;
-  }
-
-  .lock-icon,
-  .unlock-icon {
-    width: 16px;
-    height: 16px;
-  }
+  .tree-node-line { height: 26px; }
+  .node-card      { height: 24px; }
+  .node-title     { font-size: 12.5px; }
+  .tree-content   { max-height: 65vh; }
 }
 
 @media (max-width: 480px) {
-  .collapsible-tree-container {
-    padding: 1rem;
-  }
-
-  .tree-header h2 {
-    font-size: 1rem;
-  }
-
-  .tree-subtitle {
-    font-size: 0.7rem;
-  }
-
-  .tree-content {
-    max-height: 50vh;
-  }
-
-  .node-card {
-    padding: 0.5rem 0.6rem;
-    gap: 0.4rem;
-    min-width: 140px;
-  }
-
-  .node-title {
-    font-size: 0.8rem;
-  }
-
-  .node-prereq,
-  .node-unlocked {
-    display: none;
-  }
-
-  .node-level {
-    min-width: 24px;
-    height: 24px;
-    font-size: 0.65rem;
-  }
-}
-
-
-/* Completed node */
-.node-card.completed {
-  border-left-color: #3b82f6;
-  background-color: rgba(59, 130, 246, 0.08);
-}
-
-.node-card.completed .node-title {
-  color: #60a5fa;
-}
-
-.node-card.completed .lock-icon,
-.node-card.completed .unlock-icon {
-  color: #60a5fa;
-}
-
-.node-completed {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #60a5fa;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  .children-container { margin-left: 10px; padding-left: 7px; }
+  .node-prereq, .node-unlocked, .node-completed { display: none; }
+  .tree-content { max-height: 55vh; }
 }

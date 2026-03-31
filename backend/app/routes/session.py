@@ -35,24 +35,30 @@ async def create_session(tree_id: str):
 
 @router.get("/session/{session_id}")
 async def get_progress_and_unlock_status(session_id):
-    session = sessions_collection.find_one({"session_id": session_id})
-    if not session:
+    try:
+        session = sessions_collection.find_one({"session_id": session_id})
+        if not session:
+            return {"session_id": session_id, "node_unlock_status": {}}
+        node_unlock_status = session["node_unlock_status"]
+        return {"session_id": session_id, "node_unlock_status": node_unlock_status}
+    except Exception:
         return {"session_id": session_id, "node_unlock_status": {}}
-    node_unlock_status = session["node_unlock_status"]
-    return {"session_id": session_id, "node_unlock_status": node_unlock_status}
 
 
 @router.get("/session/{session_id}/completed-questions")
 async def get_full_mark_questions(session_id: str, node_path: str):
-    all_attempts = list(attempts_collection.find({
-        "session_id": session_id,
-        "node_path": node_path,
-    }))
-    completed = [
-        a["question_text"] for a in all_attempts
-        if a["marks_received"] == a["marks_total"]
-    ]
-    return {"completed_questions": list(set(completed))}
+    try:
+        all_attempts = list(attempts_collection.find({
+            "session_id": session_id,
+            "node_path": node_path,
+        }))
+        completed = [
+            a["question_text"] for a in all_attempts
+            if a["marks_received"] == a["marks_total"]
+        ]
+        return {"completed_questions": list(set(completed))}
+    except Exception:
+        return {"completed_questions": []}
 
 
 @router.delete("/session/{session_id}")

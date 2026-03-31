@@ -1,0 +1,12 @@
+fastapi[standard]>=0.134.0
+openai>=2.24.0
+pydantic>=2.12.5
+pydantic-settings>=2.13.1
+pymongo[srv]>=4.16.0
+python-docx>=1.2.0
+python-multipart>=0.0.22
+python-pptx>=1.0.2
+requests>=2.32.5
+youtube-transcript-api>=1.2.4
+python-dotenv>=1.0.0
+uvicorn>=0.30.0

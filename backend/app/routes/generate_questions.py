@@ -13,6 +13,27 @@ question_list = ["Define the following term:", "Solve this equation:", "Compare 
                  "Explain why this is true", "Explain the following topic like I'm 5 years old"]
 
 
+def extract_node_text(node_path: str, full_text: str, max_chars: int = 5000) -> str:
+    """Extract the section of full_text most relevant to the given node_path.
+
+    Searches for the leaf topic name (then parent topic names) in the document.
+    Returns a window of text centred around the first match found.
+    Falls back to the first max_chars characters if nothing matches.
+    """
+    parts = [p.strip() for p in node_path.split('/') if p.strip()]
+    lower_text = full_text.lower()
+
+    # Walk from most specific (leaf) upward, skip the root which is the whole doc
+    for part in reversed(parts[1:]):
+        idx = lower_text.find(part.lower())
+        if idx != -1:
+            start = max(0, idx - max_chars // 5)
+            end = min(len(full_text), start + max_chars)
+            return full_text[start:end]
+
+    return full_text[:max_chars]
+
+
 @router.get("/api/questions/{tree_id}/{node_path:path}")
 async def get_questions(tree_id: str, node_path: str):
     """Fetch questions for a specific node"""
@@ -33,7 +54,8 @@ async def get_questions(tree_id: str, node_path: str):
             {"_id": ObjectId(tree["document_id"])})
         if not document:
             return {"questions": []}
-        result = await generate_questions_and_answers(tree_id, node_path, document["extracted_text"])
+        node_text = extract_node_text(node_path, document["extracted_text"])
+        result = await generate_questions_and_answers(tree_id, node_path, node_text)
 
         return {"questions": result["questions"] if result else []}
     except Exception as e:
@@ -50,7 +72,7 @@ async def generate_questions_and_answers(tree_id, node_path, text):
 
 Use ONLY the following study notes as your source material:
 
-{text[:7500]}
+{text}
 
 QUESTION RULES:
 - Every question MUST be answerable using only the study notes above
@@ -126,7 +148,8 @@ async def generate_new_question(tree_id: str, node_path: str, body: GenerateNewR
         if not document:
             return {"error": "Document not found"}
 
-        question = await _generate_single_question(node_path, document["extracted_text"], body.existing_questions)
+        node_text = extract_node_text(node_path, document["extracted_text"])
+        question = await _generate_single_question(node_path, node_text, body.existing_questions)
         if not question:
             return {"error": "Failed to generate question"}
         return {"question": question}
@@ -147,7 +170,7 @@ async def _generate_single_question(node_path: str, text: str, existing_question
 
 Use ONLY the following study notes as your source material:
 
-{text[:7500]}
+{text}
 {avoid_block}
 QUESTION RULES:
 - The question MUST be answerable using only the study notes above

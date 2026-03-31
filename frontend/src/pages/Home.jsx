@@ -30,6 +30,7 @@ export default function Home() {
 
     const parsedTree = JSON.parse(storedTree);
     setSessionId(storedSession);
+    setTree(parsedTree);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);

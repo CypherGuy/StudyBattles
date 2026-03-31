@@ -46,7 +46,8 @@ describe('Home — session restore on mount', () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        `http://localhost:8000/session/${SESSION_ID}`
+        `http://localhost:8000/session/${SESSION_ID}`,
+        expect.objectContaining({ signal: expect.any(Object) })
       );
     });
   });

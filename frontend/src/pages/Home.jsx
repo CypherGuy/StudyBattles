@@ -21,6 +21,7 @@ export default function Home() {
   const [questionsByNode, setQuestionsByNode] = useState({}); // { nodePath: questions[] } prefetched on restore
   const [uploadMode, setUploadMode] = useState('file'); // 'file' | 'youtube'
   const [resetting, setResetting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // On mount, restore tree and session from localStorage, then sync unlock status from backend
   useEffect(() => {
@@ -208,9 +209,14 @@ export default function Home() {
     setMessage('Generating learning tree...');
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
       const response = await fetch(`${API_BASE}/generate-tree?document_id=${documentId}`, {
         method: 'POST',
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -237,7 +243,11 @@ export default function Home() {
 
       setMessage('Tree generated successfully!');
     } catch (error) {
-      setMessage(`Error: ${error.message}`);
+      if (error.name === 'AbortError') {
+        setMessage('Error: Tree generation timed out — please try again.');
+      } else {
+        setMessage(`Error: ${error.message}`);
+      }
     } finally {
       setTreeLoading(false);
     }
@@ -264,8 +274,9 @@ export default function Home() {
   };
 
   const handleRefresh = async () => {
-    if (!sessionId) return;
+    if (!sessionId || refreshing) return;
 
+    setRefreshing(true);
     try {
       const res = await fetch(`${API_BASE}/session/${sessionId}`);
       const data = await res.json();
@@ -290,6 +301,8 @@ export default function Home() {
       setTree(updatedTree);
     } catch (error) {
       console.error('Error refreshing session:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -431,7 +444,7 @@ export default function Home() {
       {tree && (
         <div style={{ marginTop: '8px' }}>
           <div className="tree-toolbar">
-            <button className="btn-toolbar" onClick={handleRefresh}>
+            <button className="btn-toolbar" onClick={handleRefresh} disabled={refreshing}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />

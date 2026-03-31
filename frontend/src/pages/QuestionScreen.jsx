@@ -13,12 +13,16 @@ export default function QuestionScreen() {
 
   const [questions, setQuestions] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
   const [activeIdx, setActiveIdx] = useState(0); // which card's textarea is expanded
   const [userAnswers, setUserAnswers] = useState({});
   const [evaluating, setEvaluating] = useState({});
+  const [evaluateErrors, setEvaluateErrors] = useState({});
   const [results, setResults] = useState({});
   const [previouslyCompleted, setPreviouslyCompleted] = useState(new Set());
   const [questionOverrides, setQuestionOverrides] = useState({});
+  const [generatingNew, setGeneratingNew] = useState({});
+  const [newQuestionErrors, setNewQuestionErrors] = useState({});
 
   useEffect(() => {
     if (!node || !treeId) return;
@@ -44,9 +48,9 @@ export default function QuestionScreen() {
       setQuestions(data.questions || []);
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.warn('Question fetch timed out after 30 seconds');
+        setFetchError('Questions timed out — please go back and try again.');
       } else {
-        console.error('Error fetching questions:', error);
+        setFetchError('Failed to load questions — please go back and try again.');
       }
       setQuestions([]);
     } finally {
@@ -66,6 +70,8 @@ export default function QuestionScreen() {
   };
 
   const handleNewQuestion = async (idx) => {
+    setGeneratingNew(prev => ({ ...prev, [idx]: true }));
+    setNewQuestionErrors(prev => { const next = { ...prev }; delete next[idx]; return next; });
     try {
       const encodedPath = encodeURIComponent(node.path);
       const currentQuestions = questions.map((q, i) => (questionOverrides[i] || q).question);
@@ -82,7 +88,9 @@ export default function QuestionScreen() {
         setActiveIdx(idx);
       }
     } catch (error) {
-      console.error('Error fetching new question:', error);
+      setNewQuestionErrors(prev => ({ ...prev, [idx]: 'Failed to generate a new question.' }));
+    } finally {
+      setGeneratingNew(prev => ({ ...prev, [idx]: false }));
     }
   };
 
@@ -91,6 +99,7 @@ export default function QuestionScreen() {
     if (!answer.trim()) return;
 
     setEvaluating(prev => ({ ...prev, [idx]: true }));
+    setEvaluateErrors(prev => { const next = { ...prev }; delete next[idx]; return next; });
     try {
       const res = await fetch(`${API_BASE}/evaluate`, {
         method: 'POST',
@@ -106,7 +115,7 @@ export default function QuestionScreen() {
       const data = await res.json();
       setResults(prev => ({ ...prev, [idx]: data }));
     } catch (error) {
-      console.error('Error evaluating answer:', error);
+      setEvaluateErrors(prev => ({ ...prev, [idx]: 'Failed to evaluate your answer — please try again.' }));
     } finally {
       setEvaluating(prev => ({ ...prev, [idx]: false }));
     }
@@ -174,7 +183,9 @@ export default function QuestionScreen() {
 
       {/* ── Body ── */}
       <div className="qs-body">
-        {loading ? (
+        {fetchError ? (
+          <p className="qs-fetch-error">{fetchError}</p>
+        ) : loading ? (
           <div className="qs-loading">Loading questions…</div>
         ) : questions && questions.length > 0 ? (
           <>
@@ -183,6 +194,9 @@ export default function QuestionScreen() {
               const answer = userAnswers[idx] || '';
               const result = results[idx];
               const isEvaluating = evaluating[idx];
+              const isGeneratingNew = generatingNew[idx];
+              const evaluateError = evaluateErrors[idx];
+              const newQuestionError = newQuestionErrors[idx];
               const isActive = activeIdx === idx && !result;
               const cardStateClass = getCardStateClass(result, isActive);
 
@@ -253,6 +267,12 @@ export default function QuestionScreen() {
                     </div>
                   )}
 
+                  {evaluateError && !isEvaluating && !result && (
+                    <div className="q-answer-area">
+                      <p className="q-error-msg">{evaluateError}</p>
+                    </div>
+                  )}
+
                   {/* Result area */}
                   {result && (
                     <div className="q-result-area">
@@ -273,9 +293,12 @@ export default function QuestionScreen() {
                         <button className="q-ghost-btn" onClick={() => handleTryAgain(idx)}>
                           Try again
                         </button>
-                        <button className="q-ghost-btn" onClick={() => handleNewQuestion(idx)}>
+                        <button className="q-ghost-btn" onClick={() => handleNewQuestion(idx)} disabled={isGeneratingNew}>
                           New question
                         </button>
+                        {newQuestionError && (
+                          <p className="q-error-msg">{newQuestionError}</p>
+                        )}
                       </div>
                     </div>
                   )}

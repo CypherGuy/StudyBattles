@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CollapsibleTree from '../components/CollapsibleTree';
-import API_BASE from '../api';
+import API_BASE, { apiFetch } from '../api';
 import './Home.css';
 
 export default function Home() {
@@ -36,7 +36,7 @@ export default function Home() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    fetch(`${API_BASE}/session/${storedSession}`, { signal: controller.signal })
+    apiFetch(`${API_BASE}/session/${storedSession}`, { signal: controller.signal })
       .then(res => { clearTimeout(timeoutId); return res.json(); })
       .then(data => {
         const updatedTree = JSON.parse(JSON.stringify(parsedTree));
@@ -55,7 +55,7 @@ export default function Home() {
         Promise.all(
           unlockedPaths.map(path => {
             const encodedPath = path.split('/').map(p => encodeURIComponent(p)).join('/');
-            return fetch(`${API_BASE}/api/questions/${parsedTree.tree_id}/${encodedPath}`)
+            return apiFetch(`${API_BASE}/api/questions/${parsedTree.tree_id}/${encodedPath}`)
               .then(res => res.json())
               .then(d => [path, d.questions || []])
               .catch(() => null);
@@ -122,7 +122,7 @@ export default function Home() {
     formData.append('files', file);
 
     try {
-      const response = await fetch(`${API_BASE}/upload`, {
+      const response = await apiFetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -159,7 +159,7 @@ export default function Home() {
     formData.append('url', youtubeUrl);
 
     try {
-      const response = await fetch(`${API_BASE}/upload`, {
+      const response = await apiFetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -212,7 +212,7 @@ export default function Home() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-      const response = await fetch(`${API_BASE}/generate-tree?document_id=${documentId}`, {
+      const response = await apiFetch(`${API_BASE}/generate-tree?document_id=${documentId}`, {
         method: 'POST',
         signal: controller.signal,
       });
@@ -226,7 +226,7 @@ export default function Home() {
       }
 
       // Create a session for this tree to track unlock status server-side
-      const sessionRes = await fetch(`${API_BASE}/session?tree_id=${data.tree_id}`, {
+      const sessionRes = await apiFetch(`${API_BASE}/session?tree_id=${data.tree_id}`, {
         method: 'POST',
       });
       const sessionData = await sessionRes.json();
@@ -258,7 +258,7 @@ export default function Home() {
     setResetting(true);
     if (sessionId) {
       try {
-        await fetch(`${API_BASE}/session/${sessionId}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE}/session/${sessionId}`, { method: 'DELETE' });
       } catch (error) {
         console.error('Error deleting session:', error);
       }
@@ -278,7 +278,7 @@ export default function Home() {
 
     setRefreshing(true);
     try {
-      const res = await fetch(`${API_BASE}/session/${sessionId}`);
+      const res = await apiFetch(`${API_BASE}/session/${sessionId}`);
       const data = await res.json();
 
       // Compute which nodes changed status since last render

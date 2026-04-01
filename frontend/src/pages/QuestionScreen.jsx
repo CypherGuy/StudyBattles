@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import API_BASE from '../api';
+import API_BASE, { apiFetch } from '../api';
 import './QuestionScreen.css';
 
 const MAX_CHARS = 1000;
@@ -40,7 +40,7 @@ export default function QuestionScreen() {
       const encodedPath = node.path.split('/').map(p => encodeURIComponent(p)).join('/');
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
-      const res = await fetch(`${API_BASE}/api/questions/${treeId}/${encodedPath}`, {
+      const res = await apiFetch(`${API_BASE}/api/questions/${treeId}/${encodedPath}`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -61,7 +61,7 @@ export default function QuestionScreen() {
   const fetchCompletedQuestions = async () => {
     try {
       const encodedPath = encodeURIComponent(node.path);
-      const res = await fetch(`${API_BASE}/session/${sessionId}/completed-questions?node_path=${encodedPath}`);
+      const res = await apiFetch(`${API_BASE}/session/${sessionId}/completed-questions?node_path=${encodedPath}`);
       const data = await res.json();
       setPreviouslyCompleted(new Set(data.completed_questions || []));
     } catch (error) {
@@ -75,7 +75,7 @@ export default function QuestionScreen() {
     try {
       const encodedPath = encodeURIComponent(node.path);
       const currentQuestions = questions.map((q, i) => (questionOverrides[i] || q).question);
-      const res = await fetch(`${API_BASE}/api/questions/${treeId}/${encodedPath}/generate-new`, {
+      const res = await apiFetch(`${API_BASE}/api/questions/${treeId}/${encodedPath}/generate-new`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ existing_questions: currentQuestions }),
@@ -101,7 +101,7 @@ export default function QuestionScreen() {
     setEvaluating(prev => ({ ...prev, [idx]: true }));
     setEvaluateErrors(prev => { const next = { ...prev }; delete next[idx]; return next; });
     try {
-      const res = await fetch(`${API_BASE}/evaluate`, {
+      const res = await apiFetch(`${API_BASE}/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

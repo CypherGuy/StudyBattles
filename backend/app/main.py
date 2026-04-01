@@ -1,7 +1,8 @@
-from fastapi import FastAPI
-from routes import health, upload, generate_tree, generate_questions, session, evaluate
+from fastapi import FastAPI, Depends
+from routes import health, upload, generate_tree, generate_questions, session, evaluate, auth
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
+from dependencies import require_auth
 
 
 app = FastAPI()
@@ -15,8 +16,9 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
-app.include_router(upload.router)
-app.include_router(generate_tree.router)
-app.include_router(generate_questions.router)
-app.include_router(session.router)
-app.include_router(evaluate.router)
+app.include_router(auth.router)
+app.include_router(upload.router, dependencies=[Depends(require_auth)])
+app.include_router(generate_tree.router, dependencies=[Depends(require_auth)])
+app.include_router(generate_questions.router, dependencies=[Depends(require_auth)])
+app.include_router(session.router, dependencies=[Depends(require_auth)])
+app.include_router(evaluate.router, dependencies=[Depends(require_auth)])

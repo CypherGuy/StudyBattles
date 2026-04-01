@@ -15,6 +15,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    return {"message": "This is the StudyBattles API backend. The frontend is at https://study-battles.vercel.app"}
+
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(upload.router, dependencies=[Depends(require_auth)])

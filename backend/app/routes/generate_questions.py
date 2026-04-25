@@ -144,7 +144,8 @@ async def generate_new_question(tree_id: str, node_path: str, body: GenerateNewR
         tree = trees_collection.find_one({"_id": ObjectId(tree_id)})
         if not tree:
             return {"error": "Tree not found"}
-        document = documents_collection.find_one({"_id": ObjectId(tree["document_id"])})
+        document = documents_collection.find_one(
+            {"_id": ObjectId(tree["document_id"])})
         if not document:
             return {"error": "Document not found"}
 
@@ -154,7 +155,8 @@ async def generate_new_question(tree_id: str, node_path: str, body: GenerateNewR
             return {"error": "Failed to generate question"}
         return {"question": question}
     except Exception as e:
-        print(f"ERROR generating new question for {node_path}: {type(e).__name__}: {e}")
+        print(
+            f"ERROR generating new question for {node_path}: {type(e).__name__}: {e}")
         return {"error": str(e)}
 
 

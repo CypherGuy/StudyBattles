@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from db import documents_collection, trees_collection, nodes_collection, sessions_collection
 from config import settings
 from openai import OpenAI
@@ -188,5 +188,10 @@ def generate_hierarchy_from_text(text: str, max_depth: int = 4, max_children: in
         input=prompt
     )
 
-    json_formatted_reply = json.loads(response.output_text)
+    try:
+        json_formatted_reply = json.loads(response.output_text)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=502, detail="LLM returned unstructured response. Please try again.")
+
     return json_formatted_reply

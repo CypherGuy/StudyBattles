@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from .session import store_attempt_and_check_unlock
 from models.attempt import AttemptRequest
 from pydantic import BaseModel
@@ -31,6 +31,7 @@ async def evaluate(request: EvaluateRequest):
         return {"error": "Question not found"}
 
     key_points = question["answer"]
+    key_points_json = json.dumps(key_points, indent=2)
 
     prompt = f"""You are a strict but encouraging exam marker. Your job is to decide whether each mark scheme point is demonstrated in the student's answer, then give one sentence of feedback.
 
@@ -47,7 +48,7 @@ FEEDBACK RULES:
 Student answer: "{request.user_answer}"
 
 Mark scheme points:
-{json.dumps(key_points, indent=2)}
+{key_points_json}
 
 Respond with ONLY valid JSON — no markdown, no extra text:
 {{"results": [true/false per mark scheme point], "feedback": "one sentence"}}"""
@@ -58,10 +59,14 @@ Respond with ONLY valid JSON — no markdown, no extra text:
         input=prompt
     )
 
-    parsed = json.loads(response.output_text)
+    try:
+        parsed = json.loads(response.output_text)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="LLM returned unparseable response")
     results = parsed["results"]
     feedback = parsed["feedback"]
-    key_points_hit = [point for point, hit in zip(key_points, results) if hit]
+    key_points_hit = [point for point,
+                      hit in zip(key_points, results) if hit]
 
     await store_attempt_and_check_unlock(session_id=request.session_id, attempt=AttemptRequest(
         tree_id=request.tree_id,

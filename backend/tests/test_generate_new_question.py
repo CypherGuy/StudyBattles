@@ -2,7 +2,7 @@ import json
 import pytest
 from unittest.mock import patch
 
-from tests.conftest import AUTH, trees_collection, documents_collection
+from tests.conftest import trees_collection, documents_collection
 
 TREE_ID = "507f1f77bcf86cd799439011"
 DOC_ID  = "507f1f77bcf86cd799439012"
@@ -36,7 +36,7 @@ class TestGenerateNewQuestion:
 
         with patch("routes.generate_questions.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = make_openai_response(MOCK_QUESTION)
-            response = client.post(URL, json={"existing_questions": [EXISTING_QUESTION["question"]]}, headers=AUTH)
+            response = client.post(URL, json={"existing_questions": [EXISTING_QUESTION["question"]]})
 
         assert response.status_code == 200
         data = response.json()
@@ -51,7 +51,7 @@ class TestGenerateNewQuestion:
         with patch("routes.generate_questions.OpenAI") as MockOpenAI:
             mock_create = MockOpenAI.return_value.responses.create
             mock_create.return_value = make_openai_response(MOCK_QUESTION)
-            client.post(URL, json={"existing_questions": [EXISTING_QUESTION["question"]]}, headers=AUTH)
+            client.post(URL, json={"existing_questions": [EXISTING_QUESTION["question"]]})
             prompt_used = mock_create.call_args.kwargs["input"]
 
         assert EXISTING_QUESTION["question"] in prompt_used
@@ -62,11 +62,8 @@ class TestGenerateNewQuestion:
 
         with patch("routes.generate_questions.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = make_openai_response(MOCK_QUESTION)
-            response = client.post(URL, json={"existing_questions": []}, headers=AUTH)
+            response = client.post(URL, json={"existing_questions": []})
 
         assert isinstance(response.json()["question"]["answer"], list)
         assert len(response.json()["question"]["answer"]) >= 1
 
-    def test_requires_auth(self, client):
-        response = client.post(URL, json={"existing_questions": []})
-        assert response.status_code in (401, 422)

@@ -2,7 +2,7 @@ import io
 import pytest
 from unittest.mock import patch, MagicMock
 
-from tests.conftest import AUTH, documents_collection
+from tests.conftest import documents_collection
 
 
 def _docx_bytes() -> bytes:
@@ -33,7 +33,7 @@ class TestUpload:
         response = client.post(
             "/upload",
             files={"files": ("notes.docx", io.BytesIO(_docx_bytes()), "application/octet-stream")},
-            headers=AUTH,
+
         )
 
         assert response.status_code == 200
@@ -47,7 +47,7 @@ class TestUpload:
         response = client.post(
             "/upload",
             files={"files": ("slides.pptx", io.BytesIO(_pptx_bytes()), "application/octet-stream")},
-            headers=AUTH,
+
         )
 
         assert response.status_code == 200
@@ -59,7 +59,7 @@ class TestUpload:
         client.post(
             "/upload",
             files={"files": ("notes.docx", io.BytesIO(_docx_bytes()), "application/octet-stream")},
-            headers=AUTH,
+
         )
 
         call_doc = documents_collection.insert_one.call_args[0][0]
@@ -72,7 +72,7 @@ class TestUpload:
         client.post(
             "/upload",
             files={"files": ("notes.docx", io.BytesIO(_docx_bytes()), "application/octet-stream")},
-            headers=AUTH,
+
         )
 
         call_doc = documents_collection.insert_one.call_args[0][0]
@@ -84,21 +84,21 @@ class TestUpload:
         client.post(
             "/upload",
             files={"files": ("slides.pptx", io.BytesIO(_pptx_bytes()), "application/octet-stream")},
-            headers=AUTH,
+
         )
 
         call_doc = documents_collection.insert_one.call_args[0][0]
         assert call_doc["file_type"] == "pptx"
 
     def test_upload_no_input_returns_422(self, client):
-        response = client.post("/upload", headers=AUTH)
+        response = client.post("/upload")
         assert response.status_code == 422
 
     def test_upload_unsupported_file_type_returns_415(self, client):
         response = client.post(
             "/upload",
             files={"files": ("report.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
-            headers=AUTH,
+
         )
         assert response.status_code == 415
 
@@ -106,7 +106,7 @@ class TestUpload:
         response = client.post(
             "/upload",
             data={"url": "https://www.notayoutubesite.com/watch?v=abc"},
-            headers=AUTH,
+
         )
         assert response.status_code == 422
 
@@ -123,7 +123,7 @@ class TestUpload:
             response = client.post(
                 "/upload",
                 data={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
-                headers=AUTH,
+    
             )
 
         assert response.status_code == 200
@@ -142,18 +142,11 @@ class TestUpload:
             client.post(
                 "/upload",
                 data={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
-                headers=AUTH,
+    
             )
 
         call_doc = documents_collection.insert_one.call_args[0][0]
         assert "Photosynthesis" in call_doc["extracted_text"]
-
-    def test_upload_requires_auth(self, client):
-        response = client.post(
-            "/upload",
-            files={"files": ("notes.docx", io.BytesIO(_docx_bytes()), "application/octet-stream")},
-        )
-        assert response.status_code in (401, 422)
 
     def test_youtube_transcript_api_unavailable_returns_503(self, client):
         import httpx
@@ -161,7 +154,7 @@ class TestUpload:
             response = client.post(
                 "/upload",
                 data={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
-                headers=AUTH,
+    
             )
         assert response.status_code == 503
 
@@ -173,6 +166,6 @@ class TestUpload:
             response = client.post(
                 "/upload",
                 data={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
-                headers=AUTH,
+    
             )
         assert response.status_code == 422

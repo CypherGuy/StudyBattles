@@ -1,6 +1,5 @@
 import pytest
 from tests.conftest import (
-    AUTH,
     trees_collection,
     sessions_collection,
     attempts_collection,
@@ -40,7 +39,7 @@ class TestCreateSession:
     def test_create_session_returns_session_id(self, client):
         trees_collection.find_one.return_value = SIMPLE_TREE
 
-        response = client.post(f"/session?tree_id={TREE_ID}", headers=AUTH)
+        response = client.post(f"/session?tree_id={TREE_ID}")
 
         assert response.status_code == 200
         assert "session_id" in response.json()
@@ -48,7 +47,7 @@ class TestCreateSession:
     def test_create_session_returns_node_unlock_status(self, client):
         trees_collection.find_one.return_value = SIMPLE_TREE
 
-        response = client.post(f"/session?tree_id={TREE_ID}", headers=AUTH)
+        response = client.post(f"/session?tree_id={TREE_ID}")
 
         data = response.json()
         assert "node_unlock_status" in data
@@ -57,7 +56,7 @@ class TestCreateSession:
     def test_leaf_nodes_are_available_on_creation(self, client):
         trees_collection.find_one.return_value = SIMPLE_TREE
 
-        response = client.post(f"/session?tree_id={TREE_ID}", headers=AUTH)
+        response = client.post(f"/session?tree_id={TREE_ID}")
 
         status = response.json()["node_unlock_status"]
         assert status[LEAF_PATH_1] == "available"
@@ -66,7 +65,7 @@ class TestCreateSession:
     def test_parent_nodes_are_locked_on_creation(self, client):
         trees_collection.find_one.return_value = SIMPLE_TREE
 
-        response = client.post(f"/session?tree_id={TREE_ID}", headers=AUTH)
+        response = client.post(f"/session?tree_id={TREE_ID}")
 
         status = response.json()["node_unlock_status"]
         assert status[ROOT_PATH] == "locked"
@@ -74,7 +73,7 @@ class TestCreateSession:
     def test_session_is_persisted_to_db(self, client):
         trees_collection.find_one.return_value = SIMPLE_TREE
 
-        client.post(f"/session?tree_id={TREE_ID}", headers=AUTH)
+        client.post(f"/session?tree_id={TREE_ID}")
 
         sessions_collection.insert_one.assert_called_once()
         saved = sessions_collection.insert_one.call_args[0][0]
@@ -86,7 +85,7 @@ class TestGetSession:
     def test_get_session_returns_stored_status(self, client):
         sessions_collection.find_one.return_value = STORED_SESSION
 
-        response = client.get(f"/session/{SESSION_ID}", headers=AUTH)
+        response = client.get(f"/session/{SESSION_ID}")
 
         assert response.status_code == 200
         data = response.json()
@@ -96,7 +95,7 @@ class TestGetSession:
     def test_get_nonexistent_session_returns_empty_status(self, client):
         sessions_collection.find_one.return_value = None
 
-        response = client.get("/session/does-not-exist", headers=AUTH)
+        response = client.get("/session/does-not-exist")
 
         assert response.status_code == 200
         assert response.json()["node_unlock_status"] == {}
@@ -106,7 +105,7 @@ class TestDeleteSession:
     def test_delete_session_returns_deleted_true(self, client):
         sessions_collection.find_one.return_value = STORED_SESSION
 
-        response = client.delete(f"/session/{SESSION_ID}", headers=AUTH)
+        response = client.delete(f"/session/{SESSION_ID}")
 
         assert response.status_code == 200
         assert response.json()["deleted"] is True
@@ -114,21 +113,21 @@ class TestDeleteSession:
     def test_delete_session_removes_session_from_db(self, client):
         sessions_collection.find_one.return_value = STORED_SESSION
 
-        client.delete(f"/session/{SESSION_ID}", headers=AUTH)
+        client.delete(f"/session/{SESSION_ID}")
 
         sessions_collection.delete_one.assert_called_once_with({"session_id": SESSION_ID})
 
     def test_delete_session_removes_associated_attempts(self, client):
         sessions_collection.find_one.return_value = STORED_SESSION
 
-        client.delete(f"/session/{SESSION_ID}", headers=AUTH)
+        client.delete(f"/session/{SESSION_ID}")
 
         attempts_collection.delete_many.assert_called_once_with({"session_id": SESSION_ID})
 
     def test_delete_nonexistent_session_still_returns_deleted_true(self, client):
         sessions_collection.find_one.return_value = None
 
-        response = client.delete(f"/session/ghost", headers=AUTH)
+        response = client.delete(f"/session/ghost")
 
         assert response.status_code == 200
         assert response.json()["deleted"] is True
@@ -144,7 +143,7 @@ class TestCompletedQuestions:
         response = client.get(
             f"/session/{SESSION_ID}/completed-questions",
             params={"node_path": LEAF_PATH_1},
-            headers=AUTH,
+
         )
 
         assert response.status_code == 200
@@ -160,7 +159,7 @@ class TestCompletedQuestions:
         response = client.get(
             f"/session/{SESSION_ID}/completed-questions",
             params={"node_path": LEAF_PATH_1},
-            headers=AUTH,
+
         )
 
         assert response.json()["completed_questions"] == []
@@ -174,7 +173,7 @@ class TestCompletedQuestions:
         response = client.get(
             f"/session/{SESSION_ID}/completed-questions",
             params={"node_path": LEAF_PATH_1},
-            headers=AUTH,
+
         )
 
         completed = response.json()["completed_questions"]
@@ -204,7 +203,7 @@ class TestRecordAttempt:
                 "marks_received": 0,
                 "marks_total": 1,
             },
-            headers=AUTH,
+
         )
 
         attempts_collection.insert_one.assert_called_once()
@@ -225,7 +224,7 @@ class TestRecordAttempt:
                 "marks_received": 0,
                 "marks_total": 1,
             },
-            headers=AUTH,
+
         )
 
         assert response.json()["node_beaten"] is False
@@ -251,7 +250,7 @@ class TestRecordAttempt:
                 "marks_received": 1,
                 "marks_total": 1,
             },
-            headers=AUTH,
+
         )
 
         assert response.json()["node_beaten"] is True
@@ -277,7 +276,7 @@ class TestRecordAttempt:
                 "marks_received": 1,
                 "marks_total": 1,
             },
-            headers=AUTH,
+
         )
 
         status = response.json()["node_unlock_status"]
@@ -313,7 +312,7 @@ class TestRecordAttempt:
                 "marks_received": 1,
                 "marks_total": 1,
             },
-            headers=AUTH,
+
         )
 
         status = response.json()["node_unlock_status"]

@@ -6,10 +6,14 @@ the FastAPI app is imported, so every route module binds to these mocks
 at import time.  Tests configure return values on these objects directly
 and call reset_mock() via the autouse fixture between tests.
 """
+import os
 import sys
 from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
+
+# Whitelist the TestClient host so rate limiting never blocks tests.
+os.environ.setdefault("WHITELISTED_IPS", "testclient")
 
 # ---------------------------------------------------------------------------
 # Persistent mock collections — imported by route modules at startup
@@ -31,9 +35,6 @@ if "db" not in sys.modules:
 
 # Import app AFTER db mock is in place.
 from main import app  # noqa: E402
-from dependencies import VALID_TOKEN  # noqa: E402
-
-AUTH = {"Authorization": f"Bearer {VALID_TOKEN}"}
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +48,10 @@ def client():
 
 @pytest.fixture(autouse=True)
 def reset_mocks():
-    """Reset every mock collection before each test."""
+    """Reset every mock collection and rate-limit store before each test."""
+    import dependencies
+    if hasattr(dependencies, "_store"):
+        dependencies._store.clear()
     for col in (
         documents_collection,
         trees_collection,

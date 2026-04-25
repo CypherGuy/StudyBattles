@@ -15,8 +15,7 @@ class Settings(BaseSettings):
     rapidapi_host: str
     allowed_origins: str = "http://localhost:5173,https://study-battles.vercel.app"
 
-    access_password: str
-    secret_key: str
+    whitelisted_ips: str = ""
 
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,

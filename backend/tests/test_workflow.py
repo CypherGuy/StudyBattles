@@ -11,7 +11,6 @@ from unittest.mock import patch, MagicMock
 from bson import ObjectId
 
 from tests.conftest import (
-    AUTH,
     documents_collection,
     trees_collection,
     nodes_collection,
@@ -76,7 +75,7 @@ class TestFullHappyPath:
         response = client.post(
             "/upload",
             files={"files": ("notes.docx", io.BytesIO(buf.getvalue()), "application/octet-stream")},
-            headers=AUTH,
+
         )
         assert response.status_code == 200
         doc_id = response.json()["document_id"]
@@ -93,7 +92,7 @@ class TestFullHappyPath:
 
         with patch("routes.generate_tree.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = _openai_tree_response()
-            tree_response = client.post(f"/generate-tree?document_id={doc_id}", headers=AUTH)
+            tree_response = client.post(f"/generate-tree?document_id={doc_id}")
 
         assert tree_response.status_code == 200
         tree_data = tree_response.json()
@@ -114,7 +113,7 @@ class TestFullHappyPath:
 
         with patch("routes.generate_tree.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = _openai_tree_response()
-            response = client.post(f"/generate-tree?document_id={self.DOC_ID}", headers=AUTH)
+            response = client.post(f"/generate-tree?document_id={self.DOC_ID}")
 
         root = response.json()["root"]
         for child in root["children"]:
@@ -127,7 +126,7 @@ class TestFullHappyPath:
             "root": TREE_HIERARCHY,
         }
 
-        create_response = client.post(f"/session?tree_id={self.TREE_ID}", headers=AUTH)
+        create_response = client.post(f"/session?tree_id={self.TREE_ID}")
         assert create_response.status_code == 200
         session_id = create_response.json()["session_id"]
         initial_status = create_response.json()["node_unlock_status"]
@@ -137,7 +136,7 @@ class TestFullHappyPath:
             "tree_id": self.TREE_ID,
             "node_unlock_status": initial_status,
         }
-        get_response = client.get(f"/session/{session_id}", headers=AUTH)
+        get_response = client.get(f"/session/{session_id}")
 
         assert get_response.status_code == 200
         assert get_response.json()["node_unlock_status"] == initial_status
@@ -150,7 +149,7 @@ class TestFullHappyPath:
             "questions": [QUESTION],
         }
 
-        response = client.get(f"/api/questions/{self.TREE_ID}/Networking/TCPIP", headers=AUTH)
+        response = client.get(f"/api/questions/{self.TREE_ID}/Networking/TCPIP")
 
         assert response.status_code == 200
         questions = response.json()["questions"]
@@ -166,8 +165,8 @@ class TestFullHappyPath:
         }
 
         with patch("routes.generate_questions.OpenAI") as MockOpenAI:
-            client.get(f"/api/questions/{self.TREE_ID}/Networking/TCPIP", headers=AUTH)
-            client.get(f"/api/questions/{self.TREE_ID}/Networking/TCPIP", headers=AUTH)
+            client.get(f"/api/questions/{self.TREE_ID}/Networking/TCPIP")
+            client.get(f"/api/questions/{self.TREE_ID}/Networking/TCPIP")
             MockOpenAI.assert_not_called()
 
     def test_evaluate_then_node_beaten(self, client):
@@ -203,7 +202,7 @@ class TestFullHappyPath:
                     "user_answer": "TCPIP is a suite of protocols used on the internet.",
                     "session_id": self.SESSION_ID,
                 },
-                headers=AUTH,
+    
             )
 
         assert response.status_code == 200
@@ -244,7 +243,7 @@ class TestFullHappyPath:
                     "user_answer": "TCPIP is a suite of protocols.",
                     "session_id": self.SESSION_ID,
                 },
-                headers=AUTH,
+    
             )
 
         sessions_collection.update_one.assert_called_once()
@@ -260,7 +259,7 @@ class TestFullHappyPath:
             "node_unlock_status": {},
         }
 
-        response = client.delete(f"/session/{self.SESSION_ID}", headers=AUTH)
+        response = client.delete(f"/session/{self.SESSION_ID}")
 
         assert response.json()["deleted"] is True
         sessions_collection.delete_one.assert_called_once()

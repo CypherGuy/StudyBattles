@@ -1,8 +1,7 @@
 import json
-import pytest
 from unittest.mock import patch, MagicMock
 
-from tests.conftest import AUTH, nodes_collection, sessions_collection, attempts_collection
+from tests.conftest import nodes_collection, sessions_collection, attempts_collection
 
 TREE_ID    = "507f1f77bcf86cd799439011"
 SESSION_ID = "sess-eval-test"
@@ -56,7 +55,7 @@ class TestEvaluate:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(
                 [True, False], "Good start."
             )
-            response = client.post("/evaluate", json=EVAL_REQUEST, headers=AUTH)
+            response = client.post("/evaluate", json=EVAL_REQUEST)
 
         assert response.status_code == 200
         data = response.json()
@@ -70,7 +69,7 @@ class TestEvaluate:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(
                 [True, True], "Excellent answer."
             )
-            response = client.post("/evaluate", json=EVAL_REQUEST, headers=AUTH)
+            response = client.post("/evaluate", json=EVAL_REQUEST)
 
         data = response.json()
         assert data["marks_received"] == data["marks_total"]
@@ -82,7 +81,7 @@ class TestEvaluate:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(
                 [False, False], "Try again."
             )
-            response = client.post("/evaluate", json=EVAL_REQUEST, headers=AUTH)
+            response = client.post("/evaluate", json=EVAL_REQUEST)
 
         assert response.json()["marks_received"] == 0
 
@@ -93,7 +92,7 @@ class TestEvaluate:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(
                 [True, False], "Good start."
             )
-            response = client.post("/evaluate", json=EVAL_REQUEST, headers=AUTH)
+            response = client.post("/evaluate", json=EVAL_REQUEST)
 
         data = response.json()
         assert QUESTION["answer"][0] in data["key_points_hit"]
@@ -106,7 +105,7 @@ class TestEvaluate:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(
                 [True, False], "Good start, but mention authentication bypass."
             )
-            response = client.post("/evaluate", json=EVAL_REQUEST, headers=AUTH)
+            response = client.post("/evaluate", json=EVAL_REQUEST)
 
         assert response.json()["feedback"] == "Good start, but mention authentication bypass."
 
@@ -117,7 +116,7 @@ class TestEvaluate:
             response = client.post(
                 "/evaluate",
                 json={**EVAL_REQUEST, "question_text": "A question not in the node."},
-                headers=AUTH,
+
             )
 
         assert "error" in response.json()
@@ -129,7 +128,7 @@ class TestEvaluate:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(
                 [True, True], "Perfect."
             )
-            client.post("/evaluate", json=EVAL_REQUEST, headers=AUTH)
+            client.post("/evaluate", json=EVAL_REQUEST)
 
         attempts_collection.insert_one.assert_called_once()
         attempt = attempts_collection.insert_one.call_args[0][0]
@@ -137,15 +136,11 @@ class TestEvaluate:
         assert attempt["marks_received"] == 2
         assert attempt["marks_total"] == 2
 
-    def test_requires_auth(self, client):
-        response = client.post("/evaluate", json=EVAL_REQUEST)
-        assert response.status_code in (401, 422)
-
-    def test_openai_returns_malformed_json_raises_error(self, client):
+    def test_openai_returns_malformed_json_returns_502(self, client):
         self._setup_db()
         with patch("routes.evaluate.OpenAI") as MockOpenAI:
             m = MagicMock()
             m.output_text = "not valid json {"
             MockOpenAI.return_value.responses.create.return_value = m
-            with pytest.raises(Exception):
-                client.post("/evaluate", json=EVAL_REQUEST, headers=AUTH)
+            response = client.post("/evaluate", json=EVAL_REQUEST)
+        assert response.status_code == 502

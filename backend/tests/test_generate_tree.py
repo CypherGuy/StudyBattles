@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from bson import ObjectId
 
-from tests.conftest import AUTH, documents_collection, trees_collection, nodes_collection
+from tests.conftest import documents_collection, trees_collection, nodes_collection
 from routes.generate_tree import validate_tree, set_locked_status, extract_all_node_paths
 
 DOC_ID  = "507f1f77bcf86cd799439011"
@@ -47,7 +47,7 @@ class TestGenerateTreeEndpoint:
         self._setup()
         with patch("routes.generate_tree.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(_fresh_hierarchy())
-            response = client.post(f"/generate-tree?document_id={DOC_ID}", headers=AUTH)
+            response = client.post(f"/generate-tree?document_id={DOC_ID}")
         assert response.status_code == 200
         assert response.json()["root"]["title"] == "Security"
 
@@ -55,14 +55,14 @@ class TestGenerateTreeEndpoint:
         self._setup()
         with patch("routes.generate_tree.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(_fresh_hierarchy())
-            response = client.post(f"/generate-tree?document_id={DOC_ID}", headers=AUTH)
+            response = client.post(f"/generate-tree?document_id={DOC_ID}")
         assert "tree_id" in response.json()
 
     def test_node_document_inserted_for_every_path(self, client):
         self._setup()
         with patch("routes.generate_tree.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(_fresh_hierarchy())
-            client.post(f"/generate-tree?document_id={DOC_ID}", headers=AUTH)
+            client.post(f"/generate-tree?document_id={DOC_ID}")
         # root + 2 leaf children = 3 nodes
         assert nodes_collection.insert_one.call_count == 3
 
@@ -70,7 +70,7 @@ class TestGenerateTreeEndpoint:
         self._setup()
         with patch("routes.generate_tree.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.responses.create.return_value = _openai_response(_fresh_hierarchy())
-            client.post(f"/generate-tree?document_id={DOC_ID}", headers=AUTH)
+            client.post(f"/generate-tree?document_id={DOC_ID}")
         documents_collection.update_one.assert_called_once()
         update_args = documents_collection.update_one.call_args[0]
         assert "tree_id" in update_args[1]["$set"]
@@ -84,16 +84,11 @@ class TestGenerateTreeEndpoint:
         }
 
         with patch("routes.generate_tree.OpenAI") as MockOpenAI:
-            response = client.post(f"/generate-tree?document_id={DOC_ID}", headers=AUTH)
+            response = client.post(f"/generate-tree?document_id={DOC_ID}")
             MockOpenAI.assert_not_called()
 
         assert response.status_code == 200
         assert response.json()["root"]["title"] == "Security"
-
-    def test_requires_auth(self, client):
-        response = client.post(f"/generate-tree?document_id={DOC_ID}")
-        assert response.status_code in (401, 422)
-
 
 class TestValidateTree:
     def test_valid_flat_tree_passes(self):

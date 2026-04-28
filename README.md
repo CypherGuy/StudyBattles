@@ -143,3 +143,9 @@ Access is gated by a single shared password set via the `access_password` env va
 - **Question regeneration** — request a fresh question for any node without repeats
 - **Error feedback** — upload failures, generation timeouts, and evaluation errors surface as user-facing messages rather than silent failures
 - **Loading states** — Generate Tree, Refresh, and New Question actions disable their controls while in-flight
+
+---
+
+## License
+
+MIT
